@@ -7,12 +7,42 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 
 from src import fjc_processor
-from src.fjc_processor import download_fjc_data, extract_case_id, filter_nos, map_outcome, _get_latest_quarterly_date
+from src.fjc_processor import download_fjc_data, extract_case_id, filter_nos, map_outcome, normalize_docket_number, _get_latest_quarterly_date
 
 
 def test_placeholder():
     """Placeholder test to verify module imports."""
     assert fjc_processor is not None
+
+
+def test_docket_normalization():
+    """Test that normalize_docket_number handles various docket number formats."""
+    # FJC short format: 2-digit year + sequence
+    assert normalize_docket_number("191234") == "2019cv1234"
+    assert normalize_docket_number("001234") == "2000cv1234"
+    assert normalize_docket_number("991234") == "1999cv1234"
+
+    # FJC long format: 4-digit year + sequence
+    assert normalize_docket_number("20191234") == "2019cv1234"
+    assert normalize_docket_number("19991234") == "1999cv1234"
+    assert normalize_docket_number("202012345") == "2020cv12345"
+
+    # CourtListener format with division prefix: "1:19-cv-01234"
+    assert normalize_docket_number("1:19-cv-01234") == "2019cv01234"
+    assert normalize_docket_number("2:21-cv-00001") == "2021cv00001"
+
+    # Hyphenated format without prefix: "19-cv-1234"
+    assert normalize_docket_number("19-cv-1234") == "2019cv1234"
+    assert normalize_docket_number("21-cv-567") == "2021cv567"
+
+    # Already semi-normalized: "1:2019cv12345"
+    assert normalize_docket_number("1:2019cv12345") == "2019cv12345"
+    assert normalize_docket_number("2019cv12345") == "2019cv12345"
+
+    # Edge cases
+    assert normalize_docket_number("") == ""
+    assert normalize_docket_number("  191234  ") == "2019cv1234"  # whitespace
+    assert normalize_docket_number("invalid-format") == "invalid-format"  # returns cleaned original
 
 
 def test_download_fjc_data_returns_path(tmp_path):
@@ -172,14 +202,19 @@ def test_case_id_extraction():
     # district column should be lowercase and stripped
     assert result['district'].tolist() == ['ca', 'ny', 'tx', 'fl']
 
-    # case_id should be in format "{district}:{docket_number}"
+    # case_id should be in format "{district}:{normalized_docket_number}"
+    # Docket numbers are now normalized (division prefixes stripped)
     expected_case_ids = [
-        'ca:1:2020cv12345',
-        'ny:2:2021cv67890',
-        'tx:3:2019cv11111',
-        'fl:6:2022cv77777',
+        'ca:2020cv12345',
+        'ny:2021cv67890',
+        'tx:2019cv11111',
+        'fl:2022cv77777',
     ]
     assert result['case_id'].tolist() == expected_case_ids
+
+    # Should have normalized docket number column
+    assert 'docket_number_normalized' in result.columns
+    assert result['docket_number_normalized'].tolist() == ['2020cv12345', '2021cv67890', '2019cv11111', '2022cv77777']
 
     # Should preserve original columns
     assert 'nature_of_suit' in result.columns

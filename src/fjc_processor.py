@@ -2,6 +2,7 @@
 
 import bz2
 import logging
+import re
 from datetime import date
 from pathlib import Path
 
@@ -9,6 +10,81 @@ import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_docket_number(docket_number: str) -> str:
+    """Normalize docket number to a consistent format for RECAP API matching.
+
+    Handles various input formats:
+    - FJC short format: "191234" → "2019cv1234"
+    - FJC long format: "20191234" → "2019cv1234"
+    - CourtListener format: "1:19-cv-01234" → "2019cv01234"
+    - Hyphenated format: "19-cv-1234" → "2019cv1234"
+    - Already normalized: "1:2019cv12345" → "2019cv12345"
+
+    Args:
+        docket_number: Raw docket number string in any format.
+
+    Returns:
+        Normalized docket number in format "{year}cv{sequence}" for API search.
+        Returns cleaned original string if format cannot be parsed.
+    """
+    if not docket_number or not isinstance(docket_number, str):
+        return str(docket_number) if docket_number else ""
+
+    docket_number = docket_number.strip()
+
+    # Pattern 1: CourtListener format "1:19-cv-01234" or "19-cv-1234"
+    # Matches optional division prefix, 2 or 4 digit year, -cv-, sequence
+    cl_pattern = r'^(?:\d+:)?(\d{2,4})-cv-(\d+)$'
+    match = re.match(cl_pattern, docket_number, re.IGNORECASE)
+    if match:
+        year_str, sequence = match.groups()
+        year = _normalize_year(year_str)
+        return f"{year}cv{sequence}"
+
+    # Pattern 2: Already semi-normalized "1:2019cv12345" or "2019cv12345"
+    # Matches optional division prefix, 4-digit year, cv, sequence
+    semi_pattern = r'^(?:\d+:)?(\d{4})cv(\d+)$'
+    match = re.match(semi_pattern, docket_number, re.IGNORECASE)
+    if match:
+        year_str, sequence = match.groups()
+        return f"{year_str}cv{sequence}"
+
+    # Pattern 3: FJC numeric format - just digits
+    # Short: 6 digits "YYDDDDD" (2-digit year + 4-digit sequence)
+    # Long: 8+ digits "YYYYDDDDD" (4-digit year + sequence)
+    if docket_number.isdigit():
+        if len(docket_number) <= 6:
+            # Short format: first 2 digits are year
+            year_str = docket_number[:2]
+            sequence = docket_number[2:]
+            year = _normalize_year(year_str)
+            return f"{year}cv{sequence}"
+        else:
+            # Long format: first 4 digits are year
+            year_str = docket_number[:4]
+            sequence = docket_number[4:]
+            return f"{year_str}cv{sequence}"
+
+    # Cannot parse - return cleaned string
+    return docket_number
+
+
+def _normalize_year(year_str: str) -> str:
+    """Convert 2-digit year to 4-digit year.
+
+    Assumes years 00-29 are 2000s, 30-99 are 1900s.
+    If already 4 digits, returns as-is.
+    """
+    if len(year_str) == 4:
+        return year_str
+    year_int = int(year_str)
+    if year_int <= 29:
+        return f"20{year_str.zfill(2)}"
+    else:
+        return f"19{year_str.zfill(2)}"
+
 
 # CourtListener provides FJC IDB data as quarterly bulk exports
 # Data is updated on the last day of March, June, September, December
@@ -142,8 +218,11 @@ def extract_case_id(df: pd.DataFrame) -> pd.DataFrame:
     invalid_mask = df['district'].isin(['', 'nan', 'none', 'null'])
     df = df[~invalid_mask]
 
-    # Create case_id in format "{district}:{docket_number}"
-    df['case_id'] = df['district'] + ':' + df['docket_number'].astype(str)
+    # Normalize docket numbers for consistent API matching
+    df['docket_number_normalized'] = df['docket_number'].astype(str).apply(normalize_docket_number)
+
+    # Create case_id in format "{district}:{docket_number_normalized}"
+    df['case_id'] = df['district'] + ':' + df['docket_number_normalized']
 
     dropped_count = invalid_mask.sum()
     if dropped_count > 0:
