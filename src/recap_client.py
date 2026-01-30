@@ -87,7 +87,9 @@ BACKOFF_MAX_DELAY = 60.0  # Maximum delay cap in seconds
 BACKOFF_MAX_RETRIES = 3  # Maximum retry attempts
 
 
-def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Response:
+def _make_request(
+    url: str, headers: dict, timeout: int = 30, max_retries: int = BACKOFF_MAX_RETRIES
+) -> requests.Response:
     """Make an HTTP GET request with rate limiting and retry logic.
 
     Handles HTTP 429 (rate limit) responses by waiting and retrying once.
@@ -97,6 +99,8 @@ def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Respon
         url: The URL to request.
         headers: Request headers.
         timeout: Request timeout in seconds.
+        max_retries: Maximum number of retry attempts for transient failures.
+            Defaults to BACKOFF_MAX_RETRIES (3).
 
     Returns:
         The response object.
@@ -107,7 +111,7 @@ def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Respon
     """
     last_exception = None
 
-    for attempt in range(BACKOFF_MAX_RETRIES + 1):
+    for attempt in range(max_retries + 1):
         try:
             rate_limit()
             response = requests.get(url, headers=headers, timeout=timeout)
@@ -120,11 +124,11 @@ def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Respon
 
             # Handle 5xx server errors with exponential backoff
             if 500 <= response.status_code < 600:
-                if attempt < BACKOFF_MAX_RETRIES:
+                if attempt < max_retries:
                     delay = min(BACKOFF_BASE_DELAY * (BACKOFF_MULTIPLIER ** attempt), BACKOFF_MAX_DELAY)
                     logger.warning(
                         f"Server error ({response.status_code}) for {url}, "
-                        f"retry {attempt + 1}/{BACKOFF_MAX_RETRIES} after {delay}s"
+                        f"retry {attempt + 1}/{max_retries} after {delay}s"
                     )
                     time.sleep(delay)
                     continue
@@ -135,11 +139,11 @@ def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Respon
 
         except (requests.Timeout, requests.ConnectionError) as e:
             last_exception = e
-            if attempt < BACKOFF_MAX_RETRIES:
+            if attempt < max_retries:
                 delay = min(BACKOFF_BASE_DELAY * (BACKOFF_MULTIPLIER ** attempt), BACKOFF_MAX_DELAY)
                 logger.warning(
                     f"Transient error ({type(e).__name__}) for {url}, "
-                    f"retry {attempt + 1}/{BACKOFF_MAX_RETRIES} after {delay}s"
+                    f"retry {attempt + 1}/{max_retries} after {delay}s"
                 )
                 time.sleep(delay)
                 continue

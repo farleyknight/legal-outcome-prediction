@@ -45,7 +45,7 @@
 ## API Robustness (High Priority)
 - [x] Fix: Add HTTP 429 rate limit response handling in `src/recap_client.py` → `pytest tests/test_recap_client.py::test_429_handling` passes with retry logic on rate limit responses
 - [x] Add: Exponential backoff for failed API requests in `src/recap_client.py` → `pytest tests/test_recap_client.py::test_exponential_backoff` passes with configurable retry delays
-- [ ] Add: Configurable max retry attempts for transient failures → `pytest tests/test_recap_client.py::test_max_retries` passes respecting retry limits
+- [x] Add: Configurable max retry attempts for transient failures → `pytest tests/test_recap_client.py::test_max_retries` passes respecting retry limits
 
 ## Match Rate Improvements (High Priority)
 - [ ] Fix: Add docket number normalization in `src/fjc_processor.py:139` to standardize formats → `pytest tests/test_fjc_processor.py::test_docket_normalization` passes with consistent formatting (e.g., "1:19-cv-01234" vs "19cv1234")

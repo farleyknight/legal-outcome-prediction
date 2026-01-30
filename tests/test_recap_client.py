@@ -430,3 +430,92 @@ def test_exponential_backoff_timeout_error(monkeypatch):
 
                 # Verify successful response returned
                 assert result.status_code == 200
+
+
+def test_max_retries(monkeypatch):
+    """Test _make_request respects configurable max_retries parameter."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+
+    # All responses are 500 errors
+    mock_response_500 = Mock()
+    mock_response_500.status_code = 500
+
+    # Test max_retries=0: No retries, only 1 attempt
+    with patch(
+        "src.recap_client.requests.get",
+        return_value=mock_response_500
+    ) as mock_get:
+        with patch("src.recap_client.time.sleep") as mock_sleep:
+            time_counter = [1000.0]
+
+            def mock_time():
+                time_counter[0] += 2.0
+                return time_counter[0]
+
+            with patch("src.recap_client.time.time", side_effect=mock_time):
+                recap_client._last_request_time = 0
+
+                result = recap_client._make_request(
+                    "https://example.com/api",
+                    {"Authorization": "Token test"},
+                    max_retries=0,
+                )
+
+                # Verify only 1 attempt (no retries)
+                assert mock_get.call_count == 1
+                # Verify no backoff sleeps
+                assert mock_sleep.call_count == 0
+                assert result.status_code == 500
+
+    # Test max_retries=1: Only 1 retry, 2 total attempts
+    with patch(
+        "src.recap_client.requests.get",
+        return_value=mock_response_500
+    ) as mock_get:
+        with patch("src.recap_client.time.sleep") as mock_sleep:
+            time_counter = [1000.0]
+
+            def mock_time():
+                time_counter[0] += 2.0
+                return time_counter[0]
+
+            with patch("src.recap_client.time.time", side_effect=mock_time):
+                recap_client._last_request_time = 0
+
+                result = recap_client._make_request(
+                    "https://example.com/api",
+                    {"Authorization": "Token test"},
+                    max_retries=1,
+                )
+
+                # Verify 2 total attempts (1 initial + 1 retry)
+                assert mock_get.call_count == 2
+                # Verify 1 backoff sleep
+                assert mock_sleep.call_count == 1
+                assert result.status_code == 500
+
+    # Test default max_retries: Uses BACKOFF_MAX_RETRIES (3), so 4 total attempts
+    with patch(
+        "src.recap_client.requests.get",
+        return_value=mock_response_500
+    ) as mock_get:
+        with patch("src.recap_client.time.sleep") as mock_sleep:
+            time_counter = [1000.0]
+
+            def mock_time():
+                time_counter[0] += 2.0
+                return time_counter[0]
+
+            with patch("src.recap_client.time.time", side_effect=mock_time):
+                recap_client._last_request_time = 0
+
+                result = recap_client._make_request(
+                    "https://example.com/api",
+                    {"Authorization": "Token test"},
+                )
+
+                # Verify default behavior: 4 total attempts (1 + BACKOFF_MAX_RETRIES)
+                assert mock_get.call_count == 4
+                # Verify 3 backoff sleeps
+                assert mock_sleep.call_count == 3
+                assert result.status_code == 500
