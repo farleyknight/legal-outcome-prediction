@@ -1,23 +1,51 @@
 """FJC IDB data download and filtering."""
 
+import bz2
 import logging
+from datetime import date
 from pathlib import Path
 
 import requests
 
 logger = logging.getLogger(__name__)
 
-# FJC IDB civil terminations data URL
-FJC_CIVIL_URL = "https://www.fjc.gov/sites/default/files/idb/textfiles/cv88on.zip"
+# CourtListener provides FJC IDB data as quarterly bulk exports
+# Data is updated on the last day of March, June, September, December
+COURTLISTENER_BULK_URL = "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/bulk-data"
 DATA_DIR = Path(__file__).parent.parent / "data"
 CACHE_FILE = DATA_DIR / "fjc_civil.csv"
 
 
-def download_fjc_data() -> Path:
-    """Download FJC IDB civil terminations data.
+def _get_latest_quarterly_date() -> str:
+    """Get the most recent quarterly release date (YYYY-MM-DD format).
 
-    Downloads the FJC IDB civil cases dataset and caches it locally.
-    If the file already exists, returns the cached version.
+    Bulk data is released on March 31, June 30, September 30, December 31.
+    """
+    today = date.today()
+    year = today.year
+
+    # Quarterly release dates for current year
+    quarters = [
+        date(year, 3, 31),
+        date(year, 6, 30),
+        date(year, 9, 30),
+        date(year, 12, 31),
+    ]
+
+    # Find the most recent quarter that has passed
+    for q in reversed(quarters):
+        if today >= q:
+            return q.isoformat()
+
+    # If no quarter has passed this year, use Q4 of previous year
+    return date(year - 1, 12, 31).isoformat()
+
+
+def download_fjc_data() -> Path:
+    """Download FJC IDB civil terminations data from CourtListener.
+
+    Downloads the FJC IDB dataset from CourtListener's quarterly bulk exports
+    and caches it locally. If the file already exists, returns the cached version.
 
     Returns:
         Path to the downloaded/cached CSV file.
@@ -28,27 +56,20 @@ def download_fjc_data() -> Path:
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Downloading FJC IDB civil data from {FJC_CIVIL_URL}")
+    quarterly_date = _get_latest_quarterly_date()
+    url = f"{COURTLISTENER_BULK_URL}/fjc-integrated-database-{quarterly_date}.csv.bz2"
 
-    response = requests.get(FJC_CIVIL_URL, timeout=300, stream=True)
+    logger.info(f"Downloading FJC IDB data from {url}")
+
+    response = requests.get(url, timeout=600, stream=True)
     response.raise_for_status()
 
-    # FJC provides data as a zip file containing the CSV
-    import io
-    import zipfile
+    # Decompress the bz2 file and write to CSV
+    logger.info("Decompressing data...")
+    decompressed_data = bz2.decompress(response.content)
 
-    zip_buffer = io.BytesIO(response.content)
-    with zipfile.ZipFile(zip_buffer) as zf:
-        # Find the CSV file in the archive
-        csv_files = [f for f in zf.namelist() if f.endswith('.txt') or f.endswith('.csv')]
-        if not csv_files:
-            raise ValueError("No CSV/TXT file found in FJC zip archive")
-
-        csv_name = csv_files[0]
-        logger.info(f"Extracting {csv_name} from archive")
-
-        with zf.open(csv_name) as src, open(CACHE_FILE, 'wb') as dst:
-            dst.write(src.read())
+    with open(CACHE_FILE, 'wb') as f:
+        f.write(decompressed_data)
 
     logger.info(f"FJC data saved to {CACHE_FILE}")
     return CACHE_FILE
