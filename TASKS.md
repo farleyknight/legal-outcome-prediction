@@ -32,3 +32,12 @@
 - [x] Verify no nulls in core fields → `pytest tests/test_pipeline.py::test_no_nulls` passes
 - [x] Verify average event sequence length >= 5 → `pytest tests/test_pipeline.py::test_sequence_length` passes
 - [x] Run full pipeline on 100-case sample → `pytest` passes with all tests green → Note: 32 tests pass in ~3s
+
+## Documentation
+- [x] Add: README.md with project overview, setup instructions, and usage examples → README.md exists and includes: project description, installation steps, environment setup (.env), how to run tests, how to run pipeline
+
+## Integration Tests (Live API)
+- [ ] Add: Integration test for API authentication with live token → `pytest tests/test_integration.py::test_live_api_auth -v` passes using real COURTLISTENER_API_TOKEN from .env
+- [ ] Add: Integration test for docket search with real case → `pytest tests/test_integration.py::test_live_docket_search -v` returns valid docket data from CourtListener
+- [ ] Add: Integration test for docket entries retrieval → `pytest tests/test_integration.py::test_live_docket_entries -v` returns real docket entries with descriptions
+- [ ] Add: Integration test for end-to-end pipeline with small sample → `pytest tests/test_integration.py::test_live_pipeline_sample -v` processes 5 real cases successfully
