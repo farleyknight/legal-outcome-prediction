@@ -244,3 +244,54 @@ def test_multi_event_description():
     assert "MOTION_TO_DISMISS" in result_complex
     assert "MOTION_OTHER" in result_complex
     assert "JUDGMENT" in result_complex
+
+
+def test_matt_clark_descriptions():
+    """Test that Matt Clark dataset description formats are correctly normalized."""
+    # Matt Clark dataset uses different description styles than CourtListener
+    test_cases = [
+        # Complaint variations
+        ("Complaint filed", "COMPLAINT"),
+        ("Amended complaint filed", "COMPLAINT"),
+        # Answer variations
+        ("Answer filed by defendant", "ANSWER"),
+        ("Answer to complaint", "ANSWER"),
+        # Motion to dismiss
+        ("Motion to dismiss", "MOTION_TO_DISMISS"),
+        ("Motion to dismiss for lack of jurisdiction", "MOTION_TO_DISMISS"),
+        # Orders
+        ("Order granting motion", "ORDER"),
+        ("Order denying motion", "ORDER"),
+        ("Minute order", "ORDER"),
+        # Appeals
+        ("Notice of appeal filed", "APPEAL"),
+        ("Appeal filed", "APPEAL"),
+        # Scheduling
+        ("Scheduling conference", "SCHEDULING"),
+        ("Scheduling order entered", "SCHEDULING"),
+        # Trial
+        ("Jury trial", "TRIAL"),
+        ("Bench trial commenced", "TRIAL"),
+        ("Trial begun", "TRIAL"),
+        # Judgment
+        ("Default judgment", "JUDGMENT"),
+        ("Judgment entered", "JUDGMENT"),
+        ("Summary judgment granted", "MOTION_FOR_SUMMARY_JUDGMENT"),
+        # Discovery
+        ("Subpoena issued", "DISCOVERY"),
+        ("Deposition notice", "DISCOVERY"),
+        # Settlement
+        ("Settlement conference held", "SETTLEMENT_CONFERENCE"),
+        ("Mediation ordered", "SETTLEMENT_CONFERENCE"),
+        # Other - entries that should fall through to OTHER
+        ("Summons issued", "OTHER"),
+        ("Status report", "OTHER"),
+        ("Initial filing", "OTHER"),
+        ("Certificate of service", "OTHER"),
+    ]
+
+    for description, expected_type in test_cases:
+        result = normalize_description(description)
+        assert result == expected_type, (
+            f"Expected '{expected_type}' for '{description}', got '{result}'"
+        )
