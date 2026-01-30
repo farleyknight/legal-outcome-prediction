@@ -1,5 +1,6 @@
 """Tests for pipeline orchestration."""
 
+import json
 import logging
 from pathlib import Path
 from unittest.mock import patch, Mock
@@ -240,3 +241,53 @@ def test_no_nulls(tmp_path):
         assert field in result.columns, f"Core field '{field}' missing from output"
         null_count = result[field].isnull().sum()
         assert null_count == 0, f"Core field '{field}' has {null_count} null values (should be 0)"
+
+
+def test_sequence_length(tmp_path):
+    """Test that average event sequence length is at least 5 per success criteria."""
+    # Create mock FJC data with multiple cases
+    mock_fjc_data = pd.DataFrame({
+        'nature_of_suit': ['442', '445', '446'],
+        'disposition': ['4', '5', '4'],
+        'judgment': ['1', '2', '1'],
+        'district_id': ['CACD', 'NYSD', 'TXED'],
+        'docket_number': ['1:21-cv-00001', '1:21-cv-00002', '1:21-cv-00003'],
+        'date_filed': ['2021-01-15', '2021-02-20', '2021-03-10'],
+        'date_terminated': ['2021-06-15', '2021-08-20', '2021-09-10'],
+    })
+
+    # Create a temporary CSV file
+    csv_path = tmp_path / "fjc_civil.csv"
+    mock_fjc_data.to_csv(csv_path, index=False)
+
+    # Mock docket search result
+    mock_docket = {'id': 12345}
+
+    # Mock docket entries with 6 events (>= 5 required)
+    mock_entries = [
+        {'date_filed': '2021-01-15', 'description': 'COMPLAINT for Employment Discrimination', 'entry_number': 1},
+        {'date_filed': '2021-02-15', 'description': 'ANSWER to Complaint', 'entry_number': 2},
+        {'date_filed': '2021-03-01', 'description': 'SCHEDULING ORDER setting deadlines', 'entry_number': 3},
+        {'date_filed': '2021-04-01', 'description': 'MOTION for Summary Judgment by defendant', 'entry_number': 4},
+        {'date_filed': '2021-05-01', 'description': 'RESPONSE to Motion for Summary Judgment', 'entry_number': 5},
+        {'date_filed': '2021-06-01', 'description': 'ORDER granting summary judgment', 'entry_number': 6},
+    ]
+
+    with patch('src.pipeline.download_fjc_data', return_value=csv_path), \
+         patch('src.pipeline.search_case', return_value=mock_docket), \
+         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+        result = run_pipeline()
+
+    # Verify result has rows
+    assert len(result) > 0, "Result should have at least one row"
+
+    # Parse event_sequence JSON strings and calculate average length
+    event_lengths = []
+    for event_seq_json in result['event_sequence']:
+        events = json.loads(event_seq_json)
+        event_lengths.append(len(events))
+
+    avg_length = sum(event_lengths) / len(event_lengths)
+
+    # Assert average event sequence length is at least 5
+    assert avg_length >= 5, f"Average event sequence length {avg_length:.2f} is less than required 5"
