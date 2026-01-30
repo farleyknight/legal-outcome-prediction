@@ -2,6 +2,7 @@
 
 import logging
 import os
+import time
 
 import requests
 
@@ -9,6 +10,38 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://www.courtlistener.com/api/rest/v4/"
 COURTLISTENER_API_TOKEN_VAR = "COURTLISTENER_API_TOKEN"
+RATE_LIMIT_SECONDS = 1.0
+
+_last_request_time = 0.0
+
+
+def rate_limit():
+    """Enforce rate limiting of 1 request per second.
+
+    Sleeps if necessary to ensure at least RATE_LIMIT_SECONDS
+    have passed since the last request.
+    """
+    global _last_request_time
+    elapsed = time.time() - _last_request_time
+    if elapsed < RATE_LIMIT_SECONDS:
+        sleep_time = RATE_LIMIT_SECONDS - elapsed
+        time.sleep(sleep_time)
+    _last_request_time = time.time()
+
+
+def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Response:
+    """Make an HTTP GET request with rate limiting.
+
+    Args:
+        url: The URL to request.
+        headers: Request headers.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        The response object.
+    """
+    rate_limit()
+    return requests.get(url, headers=headers, timeout=timeout)
 
 
 def get_api_headers() -> dict:
@@ -36,7 +69,7 @@ def check_api_connection() -> bool:
     """
     try:
         headers = get_api_headers()
-        response = requests.get(BASE_URL, headers=headers, timeout=30)
+        response = _make_request(BASE_URL, headers, timeout=30)
         response.raise_for_status()
         return True
     except (requests.RequestException, ValueError) as e:
