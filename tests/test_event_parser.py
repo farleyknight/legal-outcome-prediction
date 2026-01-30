@@ -101,3 +101,104 @@ def test_description_normalization_empty_input():
     """Test that normalize_description handles empty input."""
     assert normalize_description("") == "OTHER"
     assert normalize_description(None) == "OTHER" if normalize_description(None) else True
+
+
+def test_sequence_extraction():
+    """Test parse_docket_entry and normalize_event_sequence functions."""
+    from src.event_parser import parse_docket_entry, normalize_event_sequence
+
+    # Test parse_docket_entry with a sample entry
+    sample_entry = {
+        "date_filed": "2019-03-15",
+        "description": "COMPLAINT against ABC Corp for employment discrimination",
+        "entry_number": 1,
+    }
+    parsed = parse_docket_entry(sample_entry)
+    assert parsed["date"] == "2019-03-15"
+    assert parsed["event_type"] == "COMPLAINT"
+    assert parsed["entry_number"] == 1
+
+    # Test parse_docket_entry with motion to dismiss
+    motion_entry = {
+        "date_filed": "2019-04-20",
+        "description": "MOTION to Dismiss for Failure to State a Claim",
+        "entry_number": 5,
+    }
+    parsed_motion = parse_docket_entry(motion_entry)
+    assert parsed_motion["date"] == "2019-04-20"
+    assert parsed_motion["event_type"] == "MOTION_TO_DISMISS"
+    assert parsed_motion["entry_number"] == 5
+
+    # Test normalize_event_sequence with multiple entries (out of order)
+    raw_entries = [
+        {
+            "date_filed": "2019-05-10",
+            "description": "ORDER granting motion",
+            "entry_number": 8,
+        },
+        {
+            "date_filed": "2019-03-15",
+            "description": "COMPLAINT against ABC Corp",
+            "entry_number": 1,
+        },
+        {
+            "date_filed": "2019-04-01",
+            "description": "ANSWER to Complaint",
+            "entry_number": 3,
+        },
+        {
+            "date_filed": "2019-04-20",
+            "description": "MOTION to Dismiss",
+            "entry_number": 5,
+        },
+    ]
+
+    normalized = normalize_event_sequence(raw_entries)
+
+    # Verify sorted by entry_number
+    assert len(normalized) == 4
+    assert normalized[0]["entry_number"] == 1
+    assert normalized[1]["entry_number"] == 3
+    assert normalized[2]["entry_number"] == 5
+    assert normalized[3]["entry_number"] == 8
+
+    # Verify event types are normalized correctly
+    assert normalized[0]["event_type"] == "COMPLAINT"
+    assert normalized[1]["event_type"] == "ANSWER"
+    assert normalized[2]["event_type"] == "MOTION_TO_DISMISS"
+    assert normalized[3]["event_type"] == "ORDER"
+
+    # Verify dates are preserved
+    assert normalized[0]["date"] == "2019-03-15"
+    assert normalized[1]["date"] == "2019-04-01"
+    assert normalized[2]["date"] == "2019-04-20"
+    assert normalized[3]["date"] == "2019-05-10"
+
+
+def test_parse_docket_entry_missing_fields():
+    """Test parse_docket_entry handles missing or empty fields."""
+    from src.event_parser import parse_docket_entry
+
+    # Entry with missing description
+    entry_no_desc = {
+        "date_filed": "2019-03-15",
+        "entry_number": 1,
+    }
+    parsed = parse_docket_entry(entry_no_desc)
+    assert parsed["event_type"] == "OTHER"
+    assert parsed["date"] == "2019-03-15"
+    assert parsed["entry_number"] == 1
+
+    # Empty entry
+    empty_entry = {}
+    parsed_empty = parse_docket_entry(empty_entry)
+    assert parsed_empty["event_type"] == "OTHER"
+    assert parsed_empty["date"] is None
+    assert parsed_empty["entry_number"] is None
+
+
+def test_normalize_event_sequence_empty():
+    """Test normalize_event_sequence with empty list."""
+    from src.event_parser import normalize_event_sequence
+
+    assert normalize_event_sequence([]) == []

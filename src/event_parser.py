@@ -70,10 +70,41 @@ def normalize_description(description: str) -> str:
 
 
 def parse_docket_entry(entry: dict) -> dict:
-    """Parse a raw docket entry into a normalized event."""
-    raise NotImplementedError
+    """Parse a raw docket entry into a normalized event.
+
+    Args:
+        entry: Raw docket entry dict from API with keys:
+            - date_filed: Date string (e.g., "2019-03-15")
+            - description: Raw docket entry text
+            - entry_number: Integer entry sequence number
+
+    Returns:
+        Normalized event dict with keys:
+            - date: Date string from entry
+            - event_type: Normalized EVENT_TYPE string
+            - entry_number: Integer entry sequence number
+    """
+    return {
+        "date": entry.get("date_filed"),
+        "event_type": normalize_description(entry.get("description", "")),
+        "entry_number": entry.get("entry_number"),
+    }
 
 
 def normalize_event_sequence(entries: list[dict]) -> list[dict]:
-    """Normalize a sequence of docket entries into events."""
-    raise NotImplementedError
+    """Normalize a sequence of docket entries into events.
+
+    Args:
+        entries: List of raw docket entry dicts from API, each with:
+            - date_filed: Date string
+            - description: Raw docket entry text
+            - entry_number: Integer entry sequence number
+
+    Returns:
+        List of normalized event dicts sorted by entry_number, each with:
+            - date: Date string
+            - event_type: Normalized EVENT_TYPE string
+            - entry_number: Integer entry sequence number
+    """
+    parsed = [parse_docket_entry(entry) for entry in entries]
+    return sorted(parsed, key=lambda x: x.get("entry_number", 0))

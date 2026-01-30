@@ -20,7 +20,7 @@
 ## Event Parsing
 - [x] Define event type categories (COMPLAINT, ANSWER, MOTION_TO_DISMISS, etc.) → `pytest tests/test_event_parser.py::test_event_types_defined` passes
 - [x] Implement docket description normalization → `pytest tests/test_event_parser.py::test_description_normalization` passes
-- [ ] Implement sequence extraction with dates → `pytest tests/test_event_parser.py::test_sequence_extraction` passes
+- [x] Implement sequence extraction with dates → `pytest tests/test_event_parser.py::test_sequence_extraction` passes
 
 ## Pipeline Integration
 - [ ] Implement main pipeline orchestration → `pytest tests/test_pipeline.py::test_pipeline_runs` passes
