@@ -1,7 +1,7 @@
 """Tests for docket entry parsing."""
 
 from src import event_parser
-from src.event_parser import EVENT_TYPES, normalize_description
+from src.event_parser import EVENT_TYPES, normalize_description, normalize_description_multi
 
 
 def test_placeholder():
@@ -202,3 +202,45 @@ def test_normalize_event_sequence_empty():
     from src.event_parser import normalize_event_sequence
 
     assert normalize_event_sequence([]) == []
+
+
+def test_multi_event_description():
+    """Test that normalize_description_multi returns multiple event types from a single description."""
+    # Test description with multiple distinct event types
+    # Note: "MOTION to Dismiss and ANSWER to Complaint" matches:
+    # - ANSWER (from "answer")
+    # - COMPLAINT (from "complaint")
+    # - MOTION_TO_DISMISS (from "motion to dismiss")
+    # - MOTION_OTHER (from "motion")
+    result = normalize_description_multi("MOTION to Dismiss and ANSWER to Complaint")
+    assert "MOTION_TO_DISMISS" in result
+    assert "ANSWER" in result
+    assert "COMPLAINT" in result
+    assert "MOTION_OTHER" in result
+    assert len(result) == 4
+
+    # Test description with single event type returns list of one
+    result_single = normalize_description_multi("COMPLAINT against ABC Corp")
+    assert result_single == ["COMPLAINT"]
+
+    # Test empty description returns ["OTHER"]
+    assert normalize_description_multi("") == ["OTHER"]
+
+    # Test no pattern match returns ["OTHER"]
+    assert normalize_description_multi("Some random text with no keywords") == ["OTHER"]
+
+    # Test overlapping patterns are deduplicated (motion appears in both entries)
+    result_motion = normalize_description_multi("Motion for Summary Judgment motion")
+    assert "MOTION_FOR_SUMMARY_JUDGMENT" in result_motion
+    assert "MOTION_OTHER" in result_motion
+    # Should not have duplicates
+    assert len(result_motion) == len(set(result_motion))
+
+    # Test complex multi-event description
+    result_complex = normalize_description_multi(
+        "ORDER granting MOTION to Dismiss; JUDGMENT entered"
+    )
+    assert "ORDER" in result_complex
+    assert "MOTION_TO_DISMISS" in result_complex
+    assert "MOTION_OTHER" in result_complex
+    assert "JUDGMENT" in result_complex

@@ -69,6 +69,35 @@ def normalize_description(description: str) -> str:
     return "OTHER"
 
 
+def normalize_description_multi(description: str) -> list[str]:
+    """Map a raw docket entry description to multiple EVENT_TYPE categories.
+
+    Unlike normalize_description() which returns the first match, this function
+    returns all matching event types from a single description.
+
+    Args:
+        description: Raw docket entry text (e.g., "MOTION to Dismiss and ANSWER...")
+
+    Returns:
+        List of EVENT_TYPES strings that match patterns in the description.
+        Returns ["OTHER"] if no patterns match.
+    """
+    if not description:
+        return ["OTHER"]
+
+    desc_lower = description.lower()
+    matched_types: list[str] = []
+
+    for event_type, patterns in _EVENT_PATTERNS:
+        for pattern in patterns:
+            if pattern in desc_lower:
+                if event_type not in matched_types:
+                    matched_types.append(event_type)
+                break  # Found a match for this event_type, move to next
+
+    return matched_types if matched_types else ["OTHER"]
+
+
 def parse_docket_entry(entry: dict) -> dict:
     """Parse a raw docket entry into a normalized event.
 

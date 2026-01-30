@@ -52,7 +52,7 @@
 - [x] Add: Match rate logging and metrics to `src/pipeline.py` → Running pipeline logs match rate percentage and saves to `logs/match_metrics.json`
 
 ## Data Quality (Medium Priority)
-- [ ] Fix: Handle multi-event docket descriptions in `src/event_parser.py:64-67` → `pytest tests/test_event_parser.py::test_multi_event_description` returns multiple event types from single description
+- [x] Fix: Handle multi-event docket descriptions in `src/event_parser.py:64-67` → `pytest tests/test_event_parser.py::test_multi_event_description` returns multiple event types from single description
 - [ ] Add: Validation to reject cases with negative `days_to_resolution` in `src/pipeline.py` → `pytest tests/test_pipeline.py::test_negative_days_validation` passes excluding invalid date ranges
 
 ## Performance (Low Priority)
