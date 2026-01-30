@@ -24,7 +24,7 @@
 
 ## Pipeline Integration
 - [x] Implement main pipeline orchestration → `pytest tests/test_pipeline.py::test_pipeline_runs` passes
-- [ ] Implement unmatched case logging → Running pipeline creates logs/unmatched_cases.log with entries
+- [x] Implement unmatched case logging → Running pipeline creates logs/unmatched_cases.log with entries
 - [ ] Implement output CSV generation → `python -m src.pipeline --sample 100` creates data/sample_100.csv
 
 ## Validation
