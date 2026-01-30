@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.fjc_processor import download_fjc_data, filter_nos, map_outcome, extract_case_id
-from src.recap_client import search_case, get_docket_entries
+from src.matt_clark_parser import get_case_by_court_and_docket, get_entries_for_case
 from src.event_parser import normalize_event_sequence
 
 logger = logging.getLogger(__name__)
@@ -146,8 +146,8 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
     1. Downloads FJC IDB data (or uses cached version)
     2. Filters by Nature of Suit codes (employment discrimination)
     3. Maps disposition/judgment to binary outcome
-    4. Extracts case IDs for RECAP matching
-    5. Matches cases to RECAP and fetches docket entries
+    4. Extracts case IDs for matching
+    5. Matches cases to Matt Clark dataset and fetches docket entries
     6. Generates output CSV with required schema
 
     Args:
@@ -179,7 +179,7 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
         logger.info(f"Sampling {sample_size} cases from {len(df)} filtered cases")
         df = df.head(sample_size)
 
-    # Step 6: Match cases to RECAP, fetch docket entries, build output
+    # Step 6: Match cases to Matt Clark dataset, fetch docket entries, build output
     output_rows = []
     matched_count = 0
     unmatched_count = 0
@@ -200,7 +200,16 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
         court, docket_number = parsed
 
         try:
-            result = search_case(docket_number, court)
+            # Get filing date and extract year for Matt Clark lookup
+            filing_date = row.get("date_filed", "")
+            filing_year = None
+            if filing_date and len(filing_date) >= 4:
+                try:
+                    filing_year = int(filing_date[:4])
+                except ValueError:
+                    pass
+
+            result = get_case_by_court_and_docket(court, docket_number)
             if result is None:
                 unmatched_count += 1
                 unmatched_logger.info(
@@ -209,7 +218,7 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
                 continue
 
             # Fetch docket entries
-            docket_id = result.get("id")
+            docket_id = result.get("docket_id")
             if not docket_id:
                 unmatched_count += 1
                 unmatched_logger.info(
@@ -217,12 +226,11 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
                 )
                 continue
 
-            entries = get_docket_entries(docket_id)
+            entries = get_entries_for_case(docket_id, year=filing_year)
             events = normalize_event_sequence(entries)
             event_types = [e["event_type"] for e in events]
 
-            # Get dates (CourtListener format is already YYYY-MM-DD)
-            filing_date = row.get("date_filed", "")
+            # Get termination date (filing_date already extracted above)
             termination_date = row.get("date_terminated", "")
             days_to_resolution = calculate_days_to_resolution(filing_date, termination_date)
 
@@ -254,7 +262,7 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
             )
 
     logger.info(
-        f"RECAP matching complete: {matched_count} matched, {unmatched_count} unmatched"
+        f"Matt Clark matching complete: {matched_count} matched, {unmatched_count} unmatched"
     )
 
     # Calculate and log match rate metrics

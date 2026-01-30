@@ -35,7 +35,7 @@ def test_pipeline_runs(tmp_path):
     mock_fjc_data.to_csv(csv_path, index=False)
 
     # Mock docket search result
-    mock_docket = {'id': 12345}
+    mock_docket = {'docket_id': 12345}
     mock_entries = [
         {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
         {'date_filed': '2021-02-15', 'description': 'ANSWER', 'entry_number': 2},
@@ -43,8 +43,8 @@ def test_pipeline_runs(tmp_path):
 
     # Mock download_fjc_data to return our temp file
     with patch('src.pipeline.download_fjc_data', return_value=csv_path), \
-         patch('src.pipeline.search_case', return_value=mock_docket), \
-         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+         patch('src.pipeline.get_case_by_court_and_docket', return_value=mock_docket), \
+         patch('src.pipeline.get_entries_for_case', return_value=mock_entries):
         result = run_pipeline()
 
     # Verify result is a DataFrame
@@ -99,7 +99,7 @@ def test_unmatched_case_logging(tmp_path):
     with patch('src.pipeline.LOGS_DIR', test_log_dir), \
          patch('src.pipeline.UNMATCHED_LOG_PATH', test_log_path), \
          patch('src.pipeline.download_fjc_data', return_value=csv_path), \
-         patch('src.pipeline.search_case', return_value=None):  # All cases unmatched
+         patch('src.pipeline.get_case_by_court_and_docket', return_value=None):  # All cases unmatched
         result = run_pipeline()
 
     # Verify log file was created
@@ -146,7 +146,7 @@ def test_output_schema(tmp_path):
     mock_fjc_data.to_csv(csv_path, index=False)
 
     # Mock docket search result and entries
-    mock_docket = {'id': 12345}
+    mock_docket = {'docket_id': 12345}
     mock_entries = [
         {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
         {'date_filed': '2021-03-15', 'description': 'ANSWER', 'entry_number': 2},
@@ -154,8 +154,8 @@ def test_output_schema(tmp_path):
     ]
 
     with patch('src.pipeline.download_fjc_data', return_value=csv_path), \
-         patch('src.pipeline.search_case', return_value=mock_docket), \
-         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+         patch('src.pipeline.get_case_by_court_and_docket', return_value=mock_docket), \
+         patch('src.pipeline.get_entries_for_case', return_value=mock_entries):
         result = run_pipeline()
 
     # Verify all required columns are present
@@ -222,7 +222,7 @@ def test_no_nulls(tmp_path):
     mock_fjc_data.to_csv(csv_path, index=False)
 
     # Mock docket search result and entries
-    mock_docket = {'id': 12345}
+    mock_docket = {'docket_id': 12345}
     mock_entries = [
         {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
         {'date_filed': '2021-03-15', 'description': 'ANSWER', 'entry_number': 2},
@@ -230,8 +230,8 @@ def test_no_nulls(tmp_path):
     ]
 
     with patch('src.pipeline.download_fjc_data', return_value=csv_path), \
-         patch('src.pipeline.search_case', return_value=mock_docket), \
-         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+         patch('src.pipeline.get_case_by_court_and_docket', return_value=mock_docket), \
+         patch('src.pipeline.get_entries_for_case', return_value=mock_entries):
         result = run_pipeline()
 
     # Verify result has rows
@@ -262,7 +262,7 @@ def test_sequence_length(tmp_path):
     mock_fjc_data.to_csv(csv_path, index=False)
 
     # Mock docket search result
-    mock_docket = {'id': 12345}
+    mock_docket = {'docket_id': 12345}
 
     # Mock docket entries with 6 events (>= 5 required)
     mock_entries = [
@@ -275,8 +275,8 @@ def test_sequence_length(tmp_path):
     ]
 
     with patch('src.pipeline.download_fjc_data', return_value=csv_path), \
-         patch('src.pipeline.search_case', return_value=mock_docket), \
-         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+         patch('src.pipeline.get_case_by_court_and_docket', return_value=mock_docket), \
+         patch('src.pipeline.get_entries_for_case', return_value=mock_entries):
         result = run_pipeline()
 
     # Verify result has rows
@@ -323,9 +323,9 @@ def test_match_rate_logging(tmp_path):
 
     # Mock docket search - return result for first 2 cases, None for last 2
     # Note: docket numbers are normalized by extract_case_id (e.g., 1:21-cv-00001 -> 2021cv00001)
-    def mock_search_case(docket_number, court):
+    def mock_get_case_by_court_and_docket(court, docket_number):
         if docket_number in ['2021cv00001', '2021cv00002']:
-            return {'id': 12345}
+            return {'docket_id': 12345}
         return None
 
     mock_entries = [
@@ -336,8 +336,8 @@ def test_match_rate_logging(tmp_path):
     with patch('src.pipeline.LOGS_DIR', test_log_dir), \
          patch('src.pipeline.UNMATCHED_LOG_PATH', test_log_path), \
          patch('src.pipeline.download_fjc_data', return_value=csv_path), \
-         patch('src.pipeline.search_case', side_effect=mock_search_case), \
-         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+         patch('src.pipeline.get_case_by_court_and_docket', side_effect=mock_get_case_by_court_and_docket), \
+         patch('src.pipeline.get_entries_for_case', return_value=mock_entries):
         result = run_pipeline()
 
     # Verify match_metrics.json was created
@@ -397,7 +397,7 @@ def test_negative_days_validation(tmp_path):
     unmatched_logger.handlers.clear()
 
     # Mock docket search result and entries
-    mock_docket = {'id': 12345}
+    mock_docket = {'docket_id': 12345}
     mock_entries = [
         {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
         {'date_filed': '2021-02-15', 'description': 'ANSWER', 'entry_number': 2},
@@ -406,8 +406,8 @@ def test_negative_days_validation(tmp_path):
     with patch('src.pipeline.LOGS_DIR', test_log_dir), \
          patch('src.pipeline.UNMATCHED_LOG_PATH', test_log_path), \
          patch('src.pipeline.download_fjc_data', return_value=csv_path), \
-         patch('src.pipeline.search_case', return_value=mock_docket), \
-         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+         patch('src.pipeline.get_case_by_court_and_docket', return_value=mock_docket), \
+         patch('src.pipeline.get_entries_for_case', return_value=mock_entries):
         result = run_pipeline()
 
     # Verify only 1 case in output (the valid one)
@@ -522,7 +522,7 @@ def test_complex_docket_parsing(tmp_path):
     unmatched_logger.handlers.clear()
 
     # Mock docket search result and entries
-    mock_docket = {'id': 12345}
+    mock_docket = {'docket_id': 12345}
     mock_entries = [
         {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
         {'date_filed': '2021-02-15', 'description': 'ANSWER', 'entry_number': 2},
@@ -531,8 +531,8 @@ def test_complex_docket_parsing(tmp_path):
     with patch('src.pipeline.LOGS_DIR', test_log_dir), \
          patch('src.pipeline.UNMATCHED_LOG_PATH', test_log_path), \
          patch('src.pipeline.download_fjc_data', return_value=csv_path), \
-         patch('src.pipeline.search_case', return_value=mock_docket), \
-         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+         patch('src.pipeline.get_case_by_court_and_docket', return_value=mock_docket), \
+         patch('src.pipeline.get_entries_for_case', return_value=mock_entries):
         result = run_pipeline()
 
     # Verify all 4 cases were processed successfully
