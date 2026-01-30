@@ -129,3 +129,94 @@ def test_caching(tmp_path, monkeypatch):
 
     entries_result = recap_client.read_cache("entries", entries_key)
     assert entries_result == entries_data
+
+
+def test_docket_lookup(tmp_path, monkeypatch):
+    """Test search_case() looks up dockets via CourtListener API."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+    monkeypatch.setattr(recap_client, "CACHE_DIR", tmp_path)
+
+    # Sample API response
+    sample_response = {
+        "count": 1,
+        "next": None,
+        "previous": None,
+        "results": [
+            {
+                "id": 12345678,
+                "resource_uri": "https://www.courtlistener.com/api/rest/v4/dockets/12345678/",
+                "court": "https://www.courtlistener.com/api/rest/v4/courts/nysd/",
+                "docket_number": "1:19-cv-01234",
+                "date_filed": "2019-03-15",
+                "date_terminated": "2021-06-22",
+            }
+        ],
+    }
+
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = Mock()
+    mock_response.json.return_value = sample_response
+
+    with patch("src.recap_client.requests.get", return_value=mock_response) as mock_get:
+        result = recap_client.search_case("2019cv01234", "nysd")
+
+        # Verify correct URL called
+        expected_url = f"{recap_client.BASE_URL}dockets/?court=nysd&docket_number=2019cv01234"
+        mock_get.assert_called_once_with(
+            expected_url,
+            headers={"Authorization": "Token test_token_123"},
+            timeout=30,
+        )
+
+        # Verify result contains expected docket data
+        assert result is not None
+        assert result["id"] == 12345678
+        assert result["docket_number"] == "1:19-cv-01234"
+
+
+def test_docket_lookup_cache_hit(tmp_path, monkeypatch):
+    """Test search_case() returns cached data without API call."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+    monkeypatch.setattr(recap_client, "CACHE_DIR", tmp_path)
+
+    # Pre-populate cache
+    cached_docket = {
+        "id": 12345678,
+        "docket_number": "1:19-cv-01234",
+        "date_filed": "2019-03-15",
+    }
+    recap_client.write_cache("dockets", "nysd_2019cv01234", cached_docket)
+
+    with patch("src.recap_client.requests.get") as mock_get:
+        result = recap_client.search_case("2019cv01234", "nysd")
+
+        # Verify no API call was made
+        mock_get.assert_not_called()
+
+        # Verify cached data returned
+        assert result == cached_docket
+
+
+def test_docket_lookup_not_found(tmp_path, monkeypatch):
+    """Test search_case() returns None when no docket found."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+    monkeypatch.setattr(recap_client, "CACHE_DIR", tmp_path)
+
+    # Empty results response
+    empty_response = {
+        "count": 0,
+        "next": None,
+        "previous": None,
+        "results": [],
+    }
+
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = Mock()
+    mock_response.json.return_value = empty_response
+
+    with patch("src.recap_client.requests.get", return_value=mock_response):
+        result = recap_client.search_case("9999cv99999", "nysd")
+
+        assert result is None

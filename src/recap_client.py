@@ -126,9 +126,43 @@ def check_api_connection() -> bool:
         return False
 
 
-def search_case(case_number: str, court: str):
-    """Search for a case in RECAP via CourtListener API."""
-    raise NotImplementedError
+def search_case(case_number: str, court: str) -> dict | None:
+    """Search for a case in RECAP via CourtListener API.
+
+    Args:
+        case_number: The docket number to search for (e.g., "2019cv01234").
+        court: Court abbreviation (e.g., "nysd").
+
+    Returns:
+        Dict with docket data if found, None if not found.
+    """
+    cache_key = f"{court}_{case_number}"
+
+    # Check cache first
+    cached = read_cache("dockets", cache_key)
+    if cached is not None:
+        logger.debug(f"Cache hit for docket {cache_key}")
+        return cached
+
+    # Make API request
+    url = f"{BASE_URL}dockets/?court={court}&docket_number={case_number}"
+    headers = get_api_headers()
+    response = _make_request(url, headers)
+    response.raise_for_status()
+
+    data = response.json()
+    results = data.get("results", [])
+
+    if not results:
+        logger.info(f"No docket found for {court}:{case_number}")
+        return None
+
+    # Extract first matching docket
+    docket = results[0]
+    write_cache("dockets", cache_key, docket)
+    logger.info(f"Found docket {docket.get('id')} for {court}:{case_number}")
+
+    return docket
 
 
 def get_docket_entries(docket_id: int):

@@ -15,7 +15,7 @@
 - [x] Implement CourtListener API client with auth → `pytest tests/test_recap_client.py::test_api_connection` passes
 - [x] Implement rate limiting (1 req/sec) → `pytest tests/test_recap_client.py::test_rate_limiting` passes
 - [x] Implement response caching to data/cache/ → `pytest tests/test_recap_client.py::test_caching` passes
-- [ ] Implement docket lookup by case identifier → `pytest tests/test_recap_client.py::test_docket_lookup` passes
+- [x] Implement docket lookup by case identifier → `pytest tests/test_recap_client.py::test_docket_lookup` passes
 
 ## Event Parsing
 - [ ] Define event type categories (COMPLAINT, ANSWER, MOTION_TO_DISMISS, etc.) → `pytest tests/test_event_parser.py::test_event_types_defined` passes
