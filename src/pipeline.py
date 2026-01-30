@@ -187,6 +187,25 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
         f"RECAP matching complete: {matched_count} matched, {unmatched_count} unmatched"
     )
 
+    # Calculate and log match rate metrics
+    total_count = matched_count + unmatched_count
+    match_rate_percentage = (matched_count / total_count * 100) if total_count > 0 else 0.0
+    logger.info(f"Match rate: {match_rate_percentage:.1f}% ({matched_count}/{total_count})")
+
+    # Save metrics to JSON file
+    metrics = {
+        "matched_count": matched_count,
+        "unmatched_count": unmatched_count,
+        "total_count": total_count,
+        "match_rate_percentage": round(match_rate_percentage, 2),
+        "timestamp": datetime.now().isoformat(),
+    }
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    metrics_path = LOGS_DIR / "match_metrics.json"
+    with open(metrics_path, "w") as f:
+        json.dump(metrics, f, indent=2)
+    logger.info(f"Match metrics saved to {metrics_path}")
+
     # Build output DataFrame
     output_df = pd.DataFrame(output_rows)
     logger.info(f"Pipeline complete: {len(output_df)} cases in output")

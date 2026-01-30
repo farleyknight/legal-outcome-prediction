@@ -48,8 +48,8 @@
 - [x] Add: Configurable max retry attempts for transient failures → `pytest tests/test_recap_client.py::test_max_retries` passes respecting retry limits
 
 ## Match Rate Improvements (High Priority)
-- [ ] Fix: Add docket number normalization in `src/fjc_processor.py:139` to standardize formats → `pytest tests/test_fjc_processor.py::test_docket_normalization` passes with consistent formatting (e.g., "1:19-cv-01234" vs "19cv1234")
-- [ ] Add: Match rate logging and metrics to `src/pipeline.py` → Running pipeline logs match rate percentage and saves to `logs/match_metrics.json`
+- [x] Fix: Add docket number normalization in `src/fjc_processor.py:139` to standardize formats → `pytest tests/test_fjc_processor.py::test_docket_normalization` passes with consistent formatting (e.g., "1:19-cv-01234" vs "19cv1234")
+- [x] Add: Match rate logging and metrics to `src/pipeline.py` → Running pipeline logs match rate percentage and saves to `logs/match_metrics.json`
 
 ## Data Quality (Medium Priority)
 - [ ] Fix: Handle multi-event docket descriptions in `src/event_parser.py:64-67` → `pytest tests/test_event_parser.py::test_multi_event_description` returns multiple event types from single description

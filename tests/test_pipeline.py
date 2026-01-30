@@ -291,3 +291,77 @@ def test_sequence_length(tmp_path):
 
     # Assert average event sequence length is at least 5
     assert avg_length >= 5, f"Average event sequence length {avg_length:.2f} is less than required 5"
+
+
+def test_match_rate_logging(tmp_path):
+    """Test that match rate is logged and saved to logs/match_metrics.json."""
+    # Create mock FJC data with 4 cases
+    mock_fjc_data = pd.DataFrame({
+        'nature_of_suit': ['442', '445', '446', '442'],
+        'disposition': ['4', '5', '4', '5'],
+        'judgment': ['1', '2', '1', '2'],
+        'district_id': ['CACD', 'NYSD', 'TXED', 'FLSD'],
+        'docket_number': ['1:21-cv-00001', '1:21-cv-00002', '1:21-cv-00003', '1:21-cv-00004'],
+        'date_filed': ['2021-01-15', '2021-02-20', '2021-03-10', '2021-04-01'],
+        'date_terminated': ['2021-06-15', '2021-08-20', '2021-09-10', '2021-10-01'],
+    })
+
+    # Create a temporary CSV file
+    csv_path = tmp_path / "fjc_civil.csv"
+    mock_fjc_data.to_csv(csv_path, index=False)
+
+    # Create temp log directory for test
+    test_log_dir = tmp_path / "logs"
+    test_log_dir.mkdir(parents=True, exist_ok=True)
+    test_log_path = test_log_dir / "unmatched_cases.log"
+    metrics_path = test_log_dir / "match_metrics.json"
+
+    # Clear any existing handlers from the unmatched_cases logger
+    unmatched_logger = logging.getLogger("unmatched_cases")
+    unmatched_logger.handlers.clear()
+
+    # Mock docket search - return result for first 2 cases, None for last 2
+    # Note: docket numbers are normalized by extract_case_id (e.g., 1:21-cv-00001 -> 2021cv00001)
+    def mock_search_case(docket_number, court):
+        if docket_number in ['2021cv00001', '2021cv00002']:
+            return {'id': 12345}
+        return None
+
+    mock_entries = [
+        {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
+        {'date_filed': '2021-02-15', 'description': 'ANSWER', 'entry_number': 2},
+    ]
+
+    with patch('src.pipeline.LOGS_DIR', test_log_dir), \
+         patch('src.pipeline.UNMATCHED_LOG_PATH', test_log_path), \
+         patch('src.pipeline.download_fjc_data', return_value=csv_path), \
+         patch('src.pipeline.search_case', side_effect=mock_search_case), \
+         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+        result = run_pipeline()
+
+    # Verify match_metrics.json was created
+    assert metrics_path.exists(), "Match metrics JSON file should be created"
+
+    # Load and verify metrics content
+    with open(metrics_path) as f:
+        metrics = json.load(f)
+
+    # Verify required keys exist
+    assert 'matched_count' in metrics
+    assert 'unmatched_count' in metrics
+    assert 'total_count' in metrics
+    assert 'match_rate_percentage' in metrics
+    assert 'timestamp' in metrics
+
+    # Verify values are correct (2 matched, 2 unmatched)
+    assert metrics['matched_count'] == 2
+    assert metrics['unmatched_count'] == 2
+    assert metrics['total_count'] == 4
+    assert metrics['match_rate_percentage'] == 50.0
+
+    # Verify timestamp is a valid ISO format string
+    from datetime import datetime
+    datetime.fromisoformat(metrics['timestamp'])
+
+    # Clean up logger handlers for subsequent tests
+    unmatched_logger.handlers.clear()
