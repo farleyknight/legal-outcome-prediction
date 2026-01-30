@@ -113,3 +113,79 @@ def test_unmatched_case_logging(tmp_path):
 
     # Clean up logger handlers for subsequent tests
     unmatched_logger.handlers.clear()
+
+
+def test_output_schema(tmp_path):
+    """Test that output DataFrame contains all required columns per DATA_MODEL.md."""
+    # Required columns from specs/DATA_MODEL.md Output Dataset Schema
+    REQUIRED_COLUMNS = [
+        'case_id',
+        'district',
+        'filing_date',
+        'termination_date',
+        'event_sequence',
+        'days_to_resolution',
+        'outcome',
+    ]
+
+    # Create mock FJC data with CourtListener format columns
+    mock_fjc_data = pd.DataFrame({
+        'nature_of_suit': ['442'],
+        'disposition': ['4'],
+        'judgment': ['1'],
+        'district_id': ['CACD'],
+        'docket_number': ['1:21-cv-00001'],
+        'date_filed': ['2021-01-15'],
+        'date_terminated': ['2021-06-15'],
+    })
+
+    # Create a temporary CSV file
+    csv_path = tmp_path / "fjc_civil.csv"
+    mock_fjc_data.to_csv(csv_path, index=False)
+
+    # Mock docket search result and entries
+    mock_docket = {'id': 12345}
+    mock_entries = [
+        {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
+        {'date_filed': '2021-03-15', 'description': 'ANSWER', 'entry_number': 2},
+        {'date_filed': '2021-05-15', 'description': 'ORDER granting summary judgment', 'entry_number': 3},
+    ]
+
+    with patch('src.pipeline.download_fjc_data', return_value=csv_path), \
+         patch('src.pipeline.search_case', return_value=mock_docket), \
+         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+        result = run_pipeline()
+
+    # Verify all required columns are present
+    for col in REQUIRED_COLUMNS:
+        assert col in result.columns, f"Required column '{col}' missing from output"
+
+    # Verify no extra unexpected columns (output should be clean)
+    assert set(result.columns) == set(REQUIRED_COLUMNS), \
+        f"Output columns {list(result.columns)} don't match required {REQUIRED_COLUMNS}"
+
+    # Verify column types per DATA_MODEL.md
+    assert len(result) > 0, "Result should have at least one row"
+
+    # case_id should be string format district:docket_number
+    assert result['case_id'].dtype == object  # pandas string type
+    assert ':' in result['case_id'].iloc[0]
+
+    # district should be string
+    assert result['district'].dtype == object
+
+    # filing_date and termination_date should be valid dates
+    assert result['filing_date'].iloc[0] is not None
+    assert result['termination_date'].iloc[0] is not None
+
+    # event_sequence should be JSON string
+    assert result['event_sequence'].dtype == object
+    import json
+    events = json.loads(result['event_sequence'].iloc[0])
+    assert isinstance(events, list)
+
+    # days_to_resolution should be integer
+    assert result['days_to_resolution'].iloc[0] >= 0
+
+    # outcome should be 0 or 1
+    assert result['outcome'].iloc[0] in [0, 1]

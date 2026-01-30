@@ -25,10 +25,10 @@
 ## Pipeline Integration
 - [x] Implement main pipeline orchestration → `pytest tests/test_pipeline.py::test_pipeline_runs` passes
 - [x] Implement unmatched case logging → Running pipeline creates logs/unmatched_cases.log with entries
-- [x] Implement output CSV generation → `python -m src.pipeline --sample 100` creates data/sample_100.csv
+- [x] Implement output CSV generation → `python -m src.pipeline --sample 100` creates data/sample_100.csv → Note: Requires COURTLISTENER_API_TOKEN env var for API access
 
 ## Validation
-- [ ] Verify output schema (all required columns present) → `pytest tests/test_pipeline.py::test_output_schema` passes
+- [x] Verify output schema (all required columns present) → `pytest tests/test_pipeline.py::test_output_schema` passes
 - [ ] Verify no nulls in core fields → `pytest tests/test_pipeline.py::test_no_nulls` passes
 - [ ] Verify average event sequence length >= 5 → `pytest tests/test_pipeline.py::test_sequence_length` passes
 - [ ] Run full pipeline on 100-case sample → `pytest` passes with all tests green
