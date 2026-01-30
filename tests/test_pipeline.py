@@ -189,3 +189,54 @@ def test_output_schema(tmp_path):
 
     # outcome should be 0 or 1
     assert result['outcome'].iloc[0] in [0, 1]
+
+
+def test_no_nulls(tmp_path):
+    """Test that core fields contain no null values per DATA_MODEL.md (all Nullable: No)."""
+    # Core fields from specs/DATA_MODEL.md - all marked as Nullable: No
+    CORE_FIELDS = [
+        'case_id',
+        'district',
+        'filing_date',
+        'termination_date',
+        'event_sequence',
+        'days_to_resolution',
+        'outcome',
+    ]
+
+    # Create mock FJC data with CourtListener format columns
+    mock_fjc_data = pd.DataFrame({
+        'nature_of_suit': ['442', '445'],
+        'disposition': ['4', '5'],
+        'judgment': ['1', '2'],
+        'district_id': ['CACD', 'NYSD'],
+        'docket_number': ['1:21-cv-00001', '1:21-cv-00002'],
+        'date_filed': ['2021-01-15', '2021-02-20'],
+        'date_terminated': ['2021-06-15', '2021-08-20'],
+    })
+
+    # Create a temporary CSV file
+    csv_path = tmp_path / "fjc_civil.csv"
+    mock_fjc_data.to_csv(csv_path, index=False)
+
+    # Mock docket search result and entries
+    mock_docket = {'id': 12345}
+    mock_entries = [
+        {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
+        {'date_filed': '2021-03-15', 'description': 'ANSWER', 'entry_number': 2},
+        {'date_filed': '2021-05-15', 'description': 'ORDER granting summary judgment', 'entry_number': 3},
+    ]
+
+    with patch('src.pipeline.download_fjc_data', return_value=csv_path), \
+         patch('src.pipeline.search_case', return_value=mock_docket), \
+         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+        result = run_pipeline()
+
+    # Verify result has rows
+    assert len(result) > 0, "Result should have at least one row"
+
+    # Verify no nulls in any core field
+    for field in CORE_FIELDS:
+        assert field in result.columns, f"Core field '{field}' missing from output"
+        null_count = result[field].isnull().sum()
+        assert null_count == 0, f"Core field '{field}' has {null_count} null values (should be 0)"

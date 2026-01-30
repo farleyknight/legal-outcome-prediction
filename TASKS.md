@@ -29,6 +29,6 @@
 
 ## Validation
 - [x] Verify output schema (all required columns present) → `pytest tests/test_pipeline.py::test_output_schema` passes
-- [ ] Verify no nulls in core fields → `pytest tests/test_pipeline.py::test_no_nulls` passes
+- [x] Verify no nulls in core fields → `pytest tests/test_pipeline.py::test_no_nulls` passes
 - [ ] Verify average event sequence length >= 5 → `pytest tests/test_pipeline.py::test_sequence_length` passes
 - [ ] Run full pipeline on 100-case sample → `pytest` passes with all tests green
