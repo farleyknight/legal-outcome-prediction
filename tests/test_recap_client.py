@@ -253,3 +253,180 @@ def test_429_handling(monkeypatch):
 
             # Verify successful response returned
             assert result.status_code == 200
+
+
+def test_exponential_backoff(monkeypatch):
+    """Test _make_request uses exponential backoff for 5xx errors."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+
+    # First two responses: 500 server error
+    mock_response_500_1 = Mock()
+    mock_response_500_1.status_code = 500
+
+    mock_response_500_2 = Mock()
+    mock_response_500_2.status_code = 500
+
+    # Third response: 200 success
+    mock_response_200 = Mock()
+    mock_response_200.status_code = 200
+    mock_response_200.raise_for_status = Mock()
+
+    with patch(
+        "src.recap_client.requests.get",
+        side_effect=[mock_response_500_1, mock_response_500_2, mock_response_200]
+    ) as mock_get:
+        with patch("src.recap_client.time.sleep") as mock_sleep:
+            # Mock time.time to return incrementing values to avoid rate limit sleeps
+            time_counter = [1000.0]
+
+            def mock_time():
+                time_counter[0] += 2.0  # Increment by 2s each call (> RATE_LIMIT_SECONDS)
+                return time_counter[0]
+
+            with patch("src.recap_client.time.time", side_effect=mock_time):
+                recap_client._last_request_time = 0
+
+                result = recap_client._make_request(
+                    "https://example.com/api",
+                    {"Authorization": "Token test"},
+                )
+
+                # Verify retries happened (3 total requests)
+                assert mock_get.call_count == 3
+
+                # Verify exponential backoff delays
+                # First retry: 1.0 * (2.0 ** 0) = 1.0s
+                # Second retry: 1.0 * (2.0 ** 1) = 2.0s
+                sleep_calls = [call[0][0] for call in mock_sleep.call_args_list]
+                assert len(sleep_calls) == 2
+                assert sleep_calls[0] == 1.0  # First backoff delay
+                assert sleep_calls[1] == 2.0  # Second backoff delay
+
+                # Verify successful response returned
+                assert result.status_code == 200
+
+
+def test_exponential_backoff_max_retries_exhausted(monkeypatch):
+    """Test _make_request returns error response when max retries exhausted for 5xx."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+
+    # All responses are 500 errors
+    mock_response_500 = Mock()
+    mock_response_500.status_code = 500
+
+    with patch(
+        "src.recap_client.requests.get",
+        return_value=mock_response_500
+    ) as mock_get:
+        with patch("src.recap_client.time.sleep") as mock_sleep:
+            # Mock time.time to return incrementing values to avoid rate limit sleeps
+            time_counter = [1000.0]
+
+            def mock_time():
+                time_counter[0] += 2.0
+                return time_counter[0]
+
+            with patch("src.recap_client.time.time", side_effect=mock_time):
+                recap_client._last_request_time = 0
+
+                result = recap_client._make_request(
+                    "https://example.com/api",
+                    {"Authorization": "Token test"},
+                )
+
+                # Verify all retries were attempted (initial + 3 retries = 4)
+                assert mock_get.call_count == 4
+
+                # Verify backoff delays (3 sleeps for retries)
+                assert mock_sleep.call_count == 3
+
+                # Verify error response returned after exhausting retries
+                assert result.status_code == 500
+
+
+def test_exponential_backoff_connection_error(monkeypatch):
+    """Test _make_request retries on connection errors with exponential backoff."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+
+    mock_response_200 = Mock()
+    mock_response_200.status_code = 200
+    mock_response_200.raise_for_status = Mock()
+
+    # First two calls raise ConnectionError, third succeeds
+    with patch(
+        "src.recap_client.requests.get",
+        side_effect=[
+            recap_client.requests.ConnectionError("Connection refused"),
+            recap_client.requests.ConnectionError("Connection refused"),
+            mock_response_200,
+        ]
+    ) as mock_get:
+        with patch("src.recap_client.time.sleep") as mock_sleep:
+            # Mock time.time to return incrementing values to avoid rate limit sleeps
+            time_counter = [1000.0]
+
+            def mock_time():
+                time_counter[0] += 2.0
+                return time_counter[0]
+
+            with patch("src.recap_client.time.time", side_effect=mock_time):
+                recap_client._last_request_time = 0
+
+                result = recap_client._make_request(
+                    "https://example.com/api",
+                    {"Authorization": "Token test"},
+                )
+
+                # Verify retries happened
+                assert mock_get.call_count == 3
+
+                # Verify exponential backoff delays
+                sleep_calls = [call[0][0] for call in mock_sleep.call_args_list]
+                assert len(sleep_calls) == 2
+                assert sleep_calls[0] == 1.0
+                assert sleep_calls[1] == 2.0
+
+                # Verify successful response returned
+                assert result.status_code == 200
+
+
+def test_exponential_backoff_timeout_error(monkeypatch):
+    """Test _make_request retries on timeout errors with exponential backoff."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+
+    mock_response_200 = Mock()
+    mock_response_200.status_code = 200
+    mock_response_200.raise_for_status = Mock()
+
+    # First call raises Timeout, second succeeds
+    with patch(
+        "src.recap_client.requests.get",
+        side_effect=[
+            recap_client.requests.Timeout("Request timed out"),
+            mock_response_200,
+        ]
+    ) as mock_get:
+        with patch("src.recap_client.time.sleep") as mock_sleep:
+            # Mock time.time to return incrementing values to avoid rate limit sleeps
+            time_counter = [1000.0]
+
+            def mock_time():
+                time_counter[0] += 2.0
+                return time_counter[0]
+
+            with patch("src.recap_client.time.time", side_effect=mock_time):
+                recap_client._last_request_time = 0
+
+                result = recap_client._make_request(
+                    "https://example.com/api",
+                    {"Authorization": "Token test"},
+                )
+
+                # Verify retry happened
+                assert mock_get.call_count == 2
+
+                # Verify backoff delay
+                mock_sleep.assert_called_with(1.0)
+
+                # Verify successful response returned
+                assert result.status_code == 200

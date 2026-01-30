@@ -80,11 +80,18 @@ def rate_limit():
 
 RATE_LIMIT_RETRY_DELAY = 5.0
 
+# Exponential backoff configuration for transient errors (5xx, timeouts)
+BACKOFF_BASE_DELAY = 1.0  # Initial delay in seconds
+BACKOFF_MULTIPLIER = 2.0  # Exponential factor
+BACKOFF_MAX_DELAY = 60.0  # Maximum delay cap in seconds
+BACKOFF_MAX_RETRIES = 3  # Maximum retry attempts
+
 
 def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Response:
-    """Make an HTTP GET request with rate limiting.
+    """Make an HTTP GET request with rate limiting and retry logic.
 
     Handles HTTP 429 (rate limit) responses by waiting and retrying once.
+    Handles transient errors (5xx, timeouts, connection errors) with exponential backoff.
 
     Args:
         url: The URL to request.
@@ -95,17 +102,53 @@ def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Respon
         The response object.
 
     Raises:
-        requests.HTTPError: If request fails after retry or for non-429 errors.
+        requests.HTTPError: If request fails after all retries.
+        requests.RequestException: If transient error persists after all retries.
     """
-    rate_limit()
-    response = requests.get(url, headers=headers, timeout=timeout)
+    last_exception = None
 
-    if response.status_code == 429:
-        logger.warning(f"Rate limited (429) for {url}, retrying after {RATE_LIMIT_RETRY_DELAY}s")
-        time.sleep(RATE_LIMIT_RETRY_DELAY)
-        response = requests.get(url, headers=headers, timeout=timeout)
+    for attempt in range(BACKOFF_MAX_RETRIES + 1):
+        try:
+            rate_limit()
+            response = requests.get(url, headers=headers, timeout=timeout)
 
-    return response
+            # Handle 429 rate limit with fixed delay retry
+            if response.status_code == 429:
+                logger.warning(f"Rate limited (429) for {url}, retrying after {RATE_LIMIT_RETRY_DELAY}s")
+                time.sleep(RATE_LIMIT_RETRY_DELAY)
+                response = requests.get(url, headers=headers, timeout=timeout)
+
+            # Handle 5xx server errors with exponential backoff
+            if 500 <= response.status_code < 600:
+                if attempt < BACKOFF_MAX_RETRIES:
+                    delay = min(BACKOFF_BASE_DELAY * (BACKOFF_MULTIPLIER ** attempt), BACKOFF_MAX_DELAY)
+                    logger.warning(
+                        f"Server error ({response.status_code}) for {url}, "
+                        f"retry {attempt + 1}/{BACKOFF_MAX_RETRIES} after {delay}s"
+                    )
+                    time.sleep(delay)
+                    continue
+                # Max retries exhausted, return the error response
+                return response
+
+            return response
+
+        except (requests.Timeout, requests.ConnectionError) as e:
+            last_exception = e
+            if attempt < BACKOFF_MAX_RETRIES:
+                delay = min(BACKOFF_BASE_DELAY * (BACKOFF_MULTIPLIER ** attempt), BACKOFF_MAX_DELAY)
+                logger.warning(
+                    f"Transient error ({type(e).__name__}) for {url}, "
+                    f"retry {attempt + 1}/{BACKOFF_MAX_RETRIES} after {delay}s"
+                )
+                time.sleep(delay)
+                continue
+            raise
+
+    # Should not reach here, but raise last exception if we do
+    if last_exception:
+        raise last_exception
+    raise requests.RequestException(f"Max retries exceeded for {url}")
 
 
 def get_api_headers() -> dict:

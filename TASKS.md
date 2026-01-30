@@ -44,7 +44,7 @@
 
 ## API Robustness (High Priority)
 - [x] Fix: Add HTTP 429 rate limit response handling in `src/recap_client.py` → `pytest tests/test_recap_client.py::test_429_handling` passes with retry logic on rate limit responses
-- [ ] Add: Exponential backoff for failed API requests in `src/recap_client.py` → `pytest tests/test_recap_client.py::test_exponential_backoff` passes with configurable retry delays
+- [x] Add: Exponential backoff for failed API requests in `src/recap_client.py` → `pytest tests/test_recap_client.py::test_exponential_backoff` passes with configurable retry delays
 - [ ] Add: Configurable max retry attempts for transient failures → `pytest tests/test_recap_client.py::test_max_retries` passes respecting retry limits
 
 ## Match Rate Improvements (High Priority)
