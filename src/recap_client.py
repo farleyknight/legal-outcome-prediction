@@ -78,8 +78,13 @@ def rate_limit():
     _last_request_time = time.time()
 
 
+RATE_LIMIT_RETRY_DELAY = 5.0
+
+
 def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Response:
     """Make an HTTP GET request with rate limiting.
+
+    Handles HTTP 429 (rate limit) responses by waiting and retrying once.
 
     Args:
         url: The URL to request.
@@ -88,9 +93,19 @@ def _make_request(url: str, headers: dict, timeout: int = 30) -> requests.Respon
 
     Returns:
         The response object.
+
+    Raises:
+        requests.HTTPError: If request fails after retry or for non-429 errors.
     """
     rate_limit()
-    return requests.get(url, headers=headers, timeout=timeout)
+    response = requests.get(url, headers=headers, timeout=timeout)
+
+    if response.status_code == 429:
+        logger.warning(f"Rate limited (429) for {url}, retrying after {RATE_LIMIT_RETRY_DELAY}s")
+        time.sleep(RATE_LIMIT_RETRY_DELAY)
+        response = requests.get(url, headers=headers, timeout=timeout)
+
+    return response
 
 
 def get_api_headers() -> dict:

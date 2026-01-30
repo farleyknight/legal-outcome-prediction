@@ -220,3 +220,36 @@ def test_docket_lookup_not_found(tmp_path, monkeypatch):
         result = recap_client.search_case("9999cv99999", "nysd")
 
         assert result is None
+
+
+def test_429_handling(monkeypatch):
+    """Test _make_request retries once after HTTP 429 rate limit response."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+
+    # First response: 429 rate limit
+    mock_response_429 = Mock()
+    mock_response_429.status_code = 429
+
+    # Second response: 200 success
+    mock_response_200 = Mock()
+    mock_response_200.status_code = 200
+    mock_response_200.raise_for_status = Mock()
+
+    with patch("src.recap_client.requests.get", side_effect=[mock_response_429, mock_response_200]) as mock_get:
+        with patch("src.recap_client.time.sleep") as mock_sleep:
+            # Reset rate limit timer to avoid interference
+            recap_client._last_request_time = 0
+
+            result = recap_client._make_request(
+                "https://example.com/api",
+                {"Authorization": "Token test"},
+            )
+
+            # Verify retry happened
+            assert mock_get.call_count == 2
+
+            # Verify sleep was called with retry delay
+            mock_sleep.assert_called_with(recap_client.RATE_LIMIT_RETRY_DELAY)
+
+            # Verify successful response returned
+            assert result.status_code == 200

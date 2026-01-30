@@ -41,3 +41,20 @@
 - [x] Add: Integration test for docket search with real case → `pytest tests/test_integration.py::test_live_docket_search -v` returns valid docket data from CourtListener
 - [x] Add: Integration test for docket entries retrieval → `pytest tests/test_integration.py::test_live_docket_entries -v` returns real docket entries with descriptions → Note: Skips if API token lacks docket-entries permission (paid tier required)
 - [x] Add: Integration test for end-to-end pipeline with small sample → `pytest tests/test_integration.py::test_live_pipeline_sample -v` processes 5 real cases successfully → Note: Test passes even if no RECAP matches found (older FJC cases may not be available)
+
+## API Robustness (High Priority)
+- [x] Fix: Add HTTP 429 rate limit response handling in `src/recap_client.py` → `pytest tests/test_recap_client.py::test_429_handling` passes with retry logic on rate limit responses
+- [ ] Add: Exponential backoff for failed API requests in `src/recap_client.py` → `pytest tests/test_recap_client.py::test_exponential_backoff` passes with configurable retry delays
+- [ ] Add: Configurable max retry attempts for transient failures → `pytest tests/test_recap_client.py::test_max_retries` passes respecting retry limits
+
+## Match Rate Improvements (High Priority)
+- [ ] Fix: Add docket number normalization in `src/fjc_processor.py:139` to standardize formats → `pytest tests/test_fjc_processor.py::test_docket_normalization` passes with consistent formatting (e.g., "1:19-cv-01234" vs "19cv1234")
+- [ ] Add: Match rate logging and metrics to `src/pipeline.py` → Running pipeline logs match rate percentage and saves to `logs/match_metrics.json`
+
+## Data Quality (Medium Priority)
+- [ ] Fix: Handle multi-event docket descriptions in `src/event_parser.py:64-67` → `pytest tests/test_event_parser.py::test_multi_event_description` returns multiple event types from single description
+- [ ] Add: Validation to reject cases with negative `days_to_resolution` in `src/pipeline.py` → `pytest tests/test_pipeline.py::test_negative_days_validation` passes excluding invalid date ranges
+
+## Performance (Low Priority)
+- [ ] Add: Cache negative API lookup results to avoid repeated failed searches → `pytest tests/test_recap_client.py::test_negative_cache` passes caching "not found" responses
+- [ ] Add: Improve case ID parsing robustness in `src/pipeline.py:129` for edge case docket formats → `pytest tests/test_pipeline.py::test_complex_docket_parsing` passes with various docket number formats
