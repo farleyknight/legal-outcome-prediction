@@ -1,10 +1,12 @@
 """Integration tests that require real API access."""
 
+import json
 import os
 
 import pytest
 import requests
 
+from src.pipeline import run_pipeline
 from src.recap_client import check_api_connection, get_docket_entries, search_case
 
 
@@ -74,3 +76,59 @@ def test_live_docket_entries():
     # Verify description is a non-empty string
     assert isinstance(first_entry["description"], str), "Expected 'description' to be str"
     assert len(first_entry["description"]) > 0, "Expected 'description' to be non-empty"
+
+
+@pytest.mark.skipif(
+    not os.environ.get("COURTLISTENER_API_TOKEN"),
+    reason="COURTLISTENER_API_TOKEN not set",
+)
+def test_live_pipeline_sample():
+    """Test that the full pipeline processes 5 real cases successfully.
+
+    Note: Match rate depends on FJC data availability in RECAP.
+    Older cases (pre-2000) may not be available, so we verify the pipeline
+    runs without errors and produces a valid DataFrame structure.
+    """
+    import pandas as pd
+
+    # Run the pipeline with a small 5-case sample
+    try:
+        result = run_pipeline(sample_size=5)
+    except requests.HTTPError as e:
+        if e.response.status_code == 403:
+            pytest.skip("API token does not have permission for docket-entries endpoint")
+        raise
+
+    # Verify result is a DataFrame (may be empty if no RECAP matches)
+    assert result is not None, "Pipeline returned None"
+    assert isinstance(result, pd.DataFrame), f"Expected DataFrame, got {type(result)}"
+
+    # If we have results, verify the schema and data quality
+    if len(result) > 0:
+        # Verify all required columns are present
+        required_columns = [
+            "case_id",
+            "district",
+            "filing_date",
+            "termination_date",
+            "event_sequence",
+            "days_to_resolution",
+            "outcome",
+        ]
+        for col in required_columns:
+            assert col in result.columns, f"Missing required column: {col}"
+
+        # Verify event_sequence contains valid JSON arrays
+        for idx, row in result.iterrows():
+            event_seq = row["event_sequence"]
+            assert isinstance(event_seq, str), f"Row {idx}: event_sequence should be a string"
+            parsed = json.loads(event_seq)
+            assert isinstance(parsed, list), f"Row {idx}: event_sequence should parse to a list"
+
+        # Verify outcome values are 0 or 1
+        for idx, outcome in enumerate(result["outcome"]):
+            assert outcome in (0, 1), f"Row {idx}: outcome should be 0 or 1, got {outcome}"
+    else:
+        # Pipeline ran successfully but found no RECAP matches
+        # This is acceptable for older FJC cases not in RECAP
+        pass
