@@ -12,7 +12,7 @@
 - [x] Implement case ID extraction (district, docket_number) → `pytest tests/test_fjc_processor.py::test_case_id_extraction` passes
 
 ## RECAP API Client
-- [ ] Implement CourtListener API client with auth → `pytest tests/test_recap_client.py::test_api_connection` passes
+- [x] Implement CourtListener API client with auth → `pytest tests/test_recap_client.py::test_api_connection` passes
 - [ ] Implement rate limiting (1 req/sec) → `pytest tests/test_recap_client.py::test_rate_limiting` passes
 - [ ] Implement response caching to data/cache/ → `pytest tests/test_recap_client.py::test_caching` passes
 - [ ] Implement docket lookup by case identifier → `pytest tests/test_recap_client.py::test_docket_lookup` passes
