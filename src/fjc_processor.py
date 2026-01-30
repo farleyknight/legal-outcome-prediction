@@ -123,6 +123,37 @@ def map_outcome(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def extract_case_id(df: pd.DataFrame) -> pd.DataFrame:
+    """Extract district and create case_id from FJC data.
+
+    Args:
+        df: DataFrame with 'DISTRICT' column.
+
+    Returns:
+        DataFrame with new 'district' and 'case_id' columns.
+        Rows with missing/empty district are dropped.
+    """
+    df = df.copy()
+
+    # Convert DISTRICT to lowercase string, stripping whitespace
+    df['district'] = df['DISTRICT'].astype(str).str.strip().str.lower()
+
+    # Drop rows with missing or empty district (can't match to RECAP)
+    invalid_mask = df['district'].isin(['', 'nan', 'none', 'null'])
+    df = df[~invalid_mask]
+
+    # Create case_id in format "{district}:{docket_number}"
+    df['case_id'] = df['district'] + ':' + df['DESSION'].astype(str)
+
+    dropped_count = invalid_mask.sum()
+    if dropped_count > 0:
+        logger.info(f"Dropped {dropped_count} rows with missing district")
+
+    logger.info(f"Extracted case IDs for {len(df)} rows")
+
+    return df
+
+
 def filter_nos(df: pd.DataFrame, nos_codes: list[int] = None) -> pd.DataFrame:
     """Filter DataFrame by Nature of Suit codes.
 

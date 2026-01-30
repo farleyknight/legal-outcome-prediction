@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 
 from src import fjc_processor
-from src.fjc_processor import download_fjc_data, filter_nos, map_outcome, _get_latest_quarterly_date
+from src.fjc_processor import download_fjc_data, extract_case_id, filter_nos, map_outcome, _get_latest_quarterly_date
 
 
 def test_placeholder():
@@ -153,3 +153,35 @@ def test_outcome_mapping():
     # Defendant wins from judgment (judgment=2)
     judgment_defendant = result[(result['judgment'] == 2) & (result['outcome'] == 0)]
     assert len(judgment_defendant) == 2  # disposition 5 and 18
+
+
+def test_case_id_extraction():
+    """Test that extract_case_id creates case IDs from district and docket number."""
+    # Create sample DataFrame with DISTRICT and DESSION columns (FJC naming)
+    df = pd.DataFrame({
+        'DISTRICT': ['  CA  ', 'NY', 'TX', '', 'nan', 'FL'],
+        'DESSION': ['1:2020cv12345', '2:2021cv67890', '3:2019cv11111', '4:2020cv99999', '5:2021cv88888', '6:2022cv77777'],
+        'nature_of_suit': ['442', '442', '445', '446', '442', '445'],
+    })
+
+    result = extract_case_id(df)
+
+    # Should drop rows with empty or 'nan' district
+    assert len(result) == 4
+
+    # district column should be lowercase and stripped
+    assert result['district'].tolist() == ['ca', 'ny', 'tx', 'fl']
+
+    # case_id should be in format "{district}:{docket_number}"
+    expected_case_ids = [
+        'ca:1:2020cv12345',
+        'ny:2:2021cv67890',
+        'tx:3:2019cv11111',
+        'fl:6:2022cv77777',
+    ]
+    assert result['case_id'].tolist() == expected_case_ids
+
+    # Should preserve original columns
+    assert 'nature_of_suit' in result.columns
+    assert 'DISTRICT' in result.columns
+    assert 'DESSION' in result.columns
