@@ -58,3 +58,13 @@
 ## Performance (Low Priority)
 - [x] Add: Cache negative API lookup results to avoid repeated failed searches → `pytest tests/test_recap_client.py::test_negative_cache` passes caching "not found" responses
 - [x] Add: Improve case ID parsing robustness in `src/pipeline.py:129` for edge case docket formats → `pytest tests/test_pipeline.py::test_complex_docket_parsing` passes with various docket number formats
+
+## Matt Clark Dataset Integration (High Priority)
+- [x] Add: Download script for Matt Clark dataset from archive.org → `python -m src.matt_clark_downloader` downloads cases.zip and relevant year entries files to data/matt_clark/
+- [ ] Add: Parser for Matt Clark CSV format (cases.csv, *entries.csv) → `pytest tests/test_matt_clark_parser.py` passes
+- [ ] Refactor: Replace RECAP API calls in pipeline with Matt Clark data joins → Pipeline uses local Matt Clark data instead of CourtListener API
+- [ ] Update: Case matching logic to join FJC IDB cases with Matt Clark cases by court + docket_number → `pytest tests/test_case_matching.py::test_fjc_matt_clark_join` passes
+- [ ] Update: Event parser to handle Matt Clark entry descriptions → `pytest tests/test_event_parser.py::test_matt_clark_descriptions` passes
+- [ ] Remove: CourtListener API dependency (keep as optional fallback) → Pipeline runs without COURTLISTENER_API_TOKEN env var
+- [ ] Update: README.md to document Matt Clark data source and new setup instructions → README reflects new data pipeline
+- [ ] Add: Script to filter Matt Clark data to employment discrimination cases only → Reduces data size for faster iteration
