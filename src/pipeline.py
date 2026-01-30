@@ -78,6 +78,67 @@ def calculate_days_to_resolution(filing_date: str, termination_date: str) -> int
         return None
 
 
+def parse_case_id(case_id: str) -> tuple[str, str] | None:
+    """Parse case_id into (court, docket_number) tuple.
+
+    Handles edge cases like:
+    - Standard: "nysd:2019cv01234" -> ("nysd", "2019cv01234")
+    - Division prefix: "cacd:1:2019cv01234" -> ("cacd", "2019cv01234")
+    - Whitespace: "  nysd : 2019cv01234  " -> ("nysd", "2019cv01234")
+    - Empty district: ":2019cv01234" -> None
+    - Empty docket: "nysd:" -> None
+    - No colon: "nysd2019cv01234" -> None
+
+    Args:
+        case_id: Case identifier in format "district:docket_number".
+
+    Returns:
+        Tuple of (court, docket_number), or None if unparseable.
+    """
+    if not case_id or not isinstance(case_id, str):
+        return None
+
+    # Strip whitespace from the whole string
+    case_id = case_id.strip()
+
+    # Must contain at least one colon
+    if ":" not in case_id:
+        return None
+
+    # Split on first colon to get district
+    parts = case_id.split(":", 1)
+    court = parts[0].strip().lower()
+    remainder = parts[1].strip()
+
+    # Validate court is not empty
+    if not court:
+        return None
+
+    # Validate remainder is not empty
+    if not remainder:
+        return None
+
+    # Handle division prefix format: "1:2019cv01234" -> "2019cv01234"
+    # Division prefixes are single digits followed by colon
+    if ":" in remainder:
+        sub_parts = remainder.split(":", 1)
+        # Check if first part is a division prefix (single digit, strip whitespace for check)
+        first_part = sub_parts[0].strip()
+        if len(first_part) == 1 and first_part.isdigit():
+            docket_number = sub_parts[1].strip()
+        else:
+            # Keep the full remainder if not a division prefix
+            docket_number = remainder
+    else:
+        docket_number = remainder
+
+    # Final validation: docket number must not be empty
+    if not docket_number:
+        return None
+
+    return (court, docket_number)
+
+
 def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
     """Run the full data pipeline.
 
@@ -126,17 +187,17 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
     for _, row in df.iterrows():
         case_id = row["case_id"]
         district = row["district"]
-        # Parse case_id format: "district:docket_number" (docket_number may contain colons)
-        parts = case_id.split(":", 1)
-        if len(parts) != 2:
+
+        # Parse case_id using robust parser
+        parsed = parse_case_id(case_id)
+        if parsed is None:
             unmatched_count += 1
             unmatched_logger.info(
                 f"case_id={case_id} district={district} invalid_format=true"
             )
             continue
 
-        court = parts[0].lower()
-        docket_number = parts[1]
+        court, docket_number = parsed
 
         try:
             result = search_case(docket_number, court)

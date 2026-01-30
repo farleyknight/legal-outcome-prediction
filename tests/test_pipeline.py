@@ -6,9 +6,10 @@ from pathlib import Path
 from unittest.mock import patch, Mock
 
 import pandas as pd
+import pytest
 
 from src import pipeline
-from src.pipeline import run_pipeline, setup_unmatched_logger, UNMATCHED_LOG_PATH
+from src.pipeline import run_pipeline, setup_unmatched_logger, UNMATCHED_LOG_PATH, parse_case_id
 
 
 def test_placeholder():
@@ -426,4 +427,125 @@ def test_negative_days_validation(tmp_path):
     assert 'nysd' in log_content.lower(), "Log should contain the invalid case's district"
 
     # Clean up logger handlers for subsequent tests
+    unmatched_logger.handlers.clear()
+
+
+class TestParseCaseId:
+    """Tests for parse_case_id function handling various docket formats."""
+
+    def test_standard_format(self):
+        """Test standard district:docket_number format."""
+        result = parse_case_id("nysd:2019cv01234")
+        assert result == ("nysd", "2019cv01234")
+
+    def test_uppercase_district(self):
+        """Test that uppercase district is normalized to lowercase."""
+        result = parse_case_id("NYSD:2019cv01234")
+        assert result == ("nysd", "2019cv01234")
+
+    def test_division_prefix_format(self):
+        """Test docket number with division prefix (e.g., 1:2019cv01234)."""
+        result = parse_case_id("cacd:1:2019cv01234")
+        assert result == ("cacd", "2019cv01234")
+
+    def test_whitespace_handling(self):
+        """Test that whitespace is stripped from court and docket number."""
+        result = parse_case_id("  nysd : 2019cv01234  ")
+        assert result == ("nysd", "2019cv01234")
+
+    def test_whitespace_with_division_prefix(self):
+        """Test whitespace handling with division prefix format."""
+        result = parse_case_id("  cacd : 1 : 2019cv01234  ")
+        assert result == ("cacd", "2019cv01234")
+
+    def test_empty_district_returns_none(self):
+        """Test that empty district returns None."""
+        result = parse_case_id(":2019cv01234")
+        assert result is None
+
+    def test_empty_docket_returns_none(self):
+        """Test that empty docket number returns None."""
+        result = parse_case_id("nysd:")
+        assert result is None
+
+    def test_no_colon_returns_none(self):
+        """Test that case_id without colon returns None."""
+        result = parse_case_id("nysd2019cv01234")
+        assert result is None
+
+    def test_empty_string_returns_none(self):
+        """Test that empty string returns None."""
+        result = parse_case_id("")
+        assert result is None
+
+    def test_none_input_returns_none(self):
+        """Test that None input returns None."""
+        result = parse_case_id(None)
+        assert result is None
+
+    def test_whitespace_only_returns_none(self):
+        """Test that whitespace-only string returns None."""
+        result = parse_case_id("   ")
+        assert result is None
+
+    def test_multi_colon_non_division_prefix(self):
+        """Test multi-colon format where first part isn't a division prefix."""
+        # "abc:xyz:123" - "abc" is district, "xyz:123" is docket (xyz is not a single digit)
+        result = parse_case_id("nysd:abc:xyz")
+        assert result == ("nysd", "abc:xyz")
+
+
+def test_complex_docket_parsing(tmp_path):
+    """Test pipeline correctly processes cases with various docket number formats."""
+    # Create mock FJC data with various docket formats
+    # Note: These are the raw case_id formats that the pipeline will receive after extract_case_id
+    mock_fjc_data = pd.DataFrame({
+        'nature_of_suit': ['442', '445', '446', '442'],
+        'disposition': ['4', '5', '4', '5'],
+        'judgment': ['1', '2', '1', '2'],
+        'district_id': ['CACD', 'NYSD', 'TXED', 'FLSD'],
+        'docket_number': ['1:21-cv-00001', '1:21-cv-00002', '1:21-cv-00003', '1:21-cv-00004'],
+        'date_filed': ['2021-01-15', '2021-02-20', '2021-03-10', '2021-04-01'],
+        'date_terminated': ['2021-06-15', '2021-08-20', '2021-09-10', '2021-10-01'],
+    })
+
+    csv_path = tmp_path / "fjc_civil.csv"
+    mock_fjc_data.to_csv(csv_path, index=False)
+
+    # Create temp log directory
+    test_log_dir = tmp_path / "logs"
+    test_log_dir.mkdir(parents=True, exist_ok=True)
+    test_log_path = test_log_dir / "unmatched_cases.log"
+
+    # Clear logger handlers
+    unmatched_logger = logging.getLogger("unmatched_cases")
+    unmatched_logger.handlers.clear()
+
+    # Mock docket search result and entries
+    mock_docket = {'id': 12345}
+    mock_entries = [
+        {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
+        {'date_filed': '2021-02-15', 'description': 'ANSWER', 'entry_number': 2},
+    ]
+
+    with patch('src.pipeline.LOGS_DIR', test_log_dir), \
+         patch('src.pipeline.UNMATCHED_LOG_PATH', test_log_path), \
+         patch('src.pipeline.download_fjc_data', return_value=csv_path), \
+         patch('src.pipeline.search_case', return_value=mock_docket), \
+         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+        result = run_pipeline()
+
+    # Verify all 4 cases were processed successfully
+    assert len(result) == 4, f"Expected 4 cases, got {len(result)}"
+
+    # Verify case_id format is correct for all cases
+    for case_id in result['case_id']:
+        assert ':' in case_id, f"case_id '{case_id}' should contain colon"
+        parsed = parse_case_id(case_id)
+        assert parsed is not None, f"case_id '{case_id}' should be parseable"
+        court, docket = parsed
+        assert court, "Court should not be empty"
+        assert docket, "Docket number should not be empty"
+
+    # Clean up
     unmatched_logger.handlers.clear()
