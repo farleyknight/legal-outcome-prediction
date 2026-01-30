@@ -3,7 +3,7 @@
 ## Setup
 - [x] Create project structure (src/, tests/, data/, logs/) → Directories exist and are importable as packages
 - [x] Create requirements.txt with pandas, requests, pytest → `pip install -r requirements.txt` exits 0
-- [ ] Create pytest.ini with basic config → `pytest --collect-only` finds test directory
+- [x] Create pytest.ini with basic config → `pytest --collect-only` finds test directory
 
 ## FJC Data Processing
 - [ ] Implement FJC data downloader with caching → `python -c "from src.fjc_processor import download_fjc_data; download_fjc_data()"` creates data/fjc_civil.csv
