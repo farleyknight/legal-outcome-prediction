@@ -53,8 +53,8 @@
 
 ## Data Quality (Medium Priority)
 - [x] Fix: Handle multi-event docket descriptions in `src/event_parser.py:64-67` → `pytest tests/test_event_parser.py::test_multi_event_description` returns multiple event types from single description
-- [ ] Add: Validation to reject cases with negative `days_to_resolution` in `src/pipeline.py` → `pytest tests/test_pipeline.py::test_negative_days_validation` passes excluding invalid date ranges
+- [x] Add: Validation to reject cases with negative `days_to_resolution` in `src/pipeline.py` → `pytest tests/test_pipeline.py::test_negative_days_validation` passes excluding invalid date ranges
 
 ## Performance (Low Priority)
-- [ ] Add: Cache negative API lookup results to avoid repeated failed searches → `pytest tests/test_recap_client.py::test_negative_cache` passes caching "not found" responses
+- [x] Add: Cache negative API lookup results to avoid repeated failed searches → `pytest tests/test_recap_client.py::test_negative_cache` passes caching "not found" responses
 - [ ] Add: Improve case ID parsing robustness in `src/pipeline.py:129` for edge case docket formats → `pytest tests/test_pipeline.py::test_complex_docket_parsing` passes with various docket number formats

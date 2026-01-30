@@ -222,6 +222,42 @@ def test_docket_lookup_not_found(tmp_path, monkeypatch):
         assert result is None
 
 
+def test_negative_cache(tmp_path, monkeypatch):
+    """Test search_case() caches negative (not found) results to avoid redundant API calls."""
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")
+    monkeypatch.setattr(recap_client, "CACHE_DIR", tmp_path)
+
+    # Empty results response (case not found)
+    empty_response = {
+        "count": 0,
+        "next": None,
+        "previous": None,
+        "results": [],
+    }
+
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.raise_for_status = Mock()
+    mock_response.json.return_value = empty_response
+
+    with patch("src.recap_client.requests.get", return_value=mock_response) as mock_get:
+        # First call: should hit API and cache the negative result
+        result1 = recap_client.search_case("nonexistent_case", "nysd")
+        assert result1 is None
+        assert mock_get.call_count == 1
+
+        # Second call: should return from cache without hitting API
+        result2 = recap_client.search_case("nonexistent_case", "nysd")
+        assert result2 is None
+        assert mock_get.call_count == 1  # No additional API call
+
+    # Verify cache file contains NEGATIVE_CACHE_SENTINEL
+    cache_file = tmp_path / "dockets" / "nysd_nonexistent_case.json"
+    assert cache_file.exists()
+    cached_data = recap_client.read_cache("dockets", "nysd_nonexistent_case")
+    assert cached_data == recap_client.NEGATIVE_CACHE_SENTINEL
+
+
 def test_429_handling(monkeypatch):
     """Test _make_request retries once after HTTP 429 rate limit response."""
     monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test_token_123")

@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent.parent / "data"
 CACHE_DIR = DATA_DIR / "cache"
 
+# Sentinel value to distinguish "cached not found" from "cache miss"
+NEGATIVE_CACHE_SENTINEL = {"_not_found": True}
+
 BASE_URL = "https://www.courtlistener.com/api/rest/v4/"
 COURTLISTENER_API_TOKEN_VAR = "COURTLISTENER_API_TOKEN"
 RATE_LIMIT_SECONDS = 1.0
@@ -203,6 +206,10 @@ def search_case(case_number: str, court: str) -> dict | None:
     # Check cache first
     cached = read_cache("dockets", cache_key)
     if cached is not None:
+        # Check if this is a cached negative result
+        if cached == NEGATIVE_CACHE_SENTINEL:
+            logger.debug(f"Negative cache hit for docket {cache_key}")
+            return None
         logger.debug(f"Cache hit for docket {cache_key}")
         return cached
 
@@ -217,6 +224,7 @@ def search_case(case_number: str, court: str) -> dict | None:
 
     if not results:
         logger.info(f"No docket found for {court}:{case_number}")
+        write_cache("dockets", cache_key, NEGATIVE_CACHE_SENTINEL)
         return None
 
     # Extract first matching docket
