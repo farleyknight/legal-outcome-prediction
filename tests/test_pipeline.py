@@ -549,3 +549,60 @@ def test_complex_docket_parsing(tmp_path):
 
     # Clean up
     unmatched_logger.handlers.clear()
+
+
+def test_pipeline_runs_without_api_token(tmp_path, monkeypatch):
+    """Test that pipeline runs without COURTLISTENER_API_TOKEN env var.
+
+    This verifies that the pipeline has no hard dependency on the CourtListener API
+    and can run end-to-end using only the Matt Clark dataset.
+    """
+    # Explicitly unset COURTLISTENER_API_TOKEN
+    monkeypatch.delenv("COURTLISTENER_API_TOKEN", raising=False)
+
+    # Create mock FJC data
+    mock_fjc_data = pd.DataFrame({
+        'nature_of_suit': ['442', '445'],
+        'disposition': ['4', '5'],
+        'judgment': ['1', '2'],
+        'district_id': ['CACD', 'NYSD'],
+        'docket_number': ['1:21-cv-00001', '1:21-cv-00002'],
+        'date_filed': ['2021-01-15', '2021-02-20'],
+        'date_terminated': ['2021-06-15', '2021-08-20'],
+    })
+
+    csv_path = tmp_path / "fjc_civil.csv"
+    mock_fjc_data.to_csv(csv_path, index=False)
+
+    # Create temp log directory
+    test_log_dir = tmp_path / "logs"
+    test_log_dir.mkdir(parents=True, exist_ok=True)
+    test_log_path = test_log_dir / "unmatched_cases.log"
+
+    # Clear logger handlers
+    unmatched_logger = logging.getLogger("unmatched_cases")
+    unmatched_logger.handlers.clear()
+
+    # Mock docket search result and entries (simulating Matt Clark data)
+    mock_docket = {'docket_id': 12345}
+    mock_entries = [
+        {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
+        {'date_filed': '2021-02-15', 'description': 'ANSWER', 'entry_number': 2},
+    ]
+
+    with patch('src.pipeline.LOGS_DIR', test_log_dir), \
+         patch('src.pipeline.UNMATCHED_LOG_PATH', test_log_path), \
+         patch('src.pipeline.download_fjc_data', return_value=csv_path), \
+         patch('src.pipeline.get_case_by_court_and_docket', return_value=mock_docket), \
+         patch('src.pipeline.get_entries_for_case', return_value=mock_entries):
+        # This should NOT raise ValueError about missing token
+        result = run_pipeline()
+
+    # Verify pipeline ran successfully
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == 2  # Both cases should be processed
+    assert 'case_id' in result.columns
+    assert 'outcome' in result.columns
+
+    # Clean up
+    unmatched_logger.handlers.clear()
