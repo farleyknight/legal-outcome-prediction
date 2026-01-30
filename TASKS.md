@@ -61,7 +61,7 @@
 
 ## Matt Clark Dataset Integration (High Priority)
 - [x] Add: Download script for Matt Clark dataset from archive.org → `python -m src.matt_clark_downloader` downloads cases.zip and relevant year entries files to data/matt_clark/
-- [ ] Add: Parser for Matt Clark CSV format (cases.csv, *entries.csv) → `pytest tests/test_matt_clark_parser.py` passes
+- [x] Add: Parser for Matt Clark CSV format (cases.csv, *entries.csv) → `pytest tests/test_matt_clark_parser.py` passes
 - [ ] Refactor: Replace RECAP API calls in pipeline with Matt Clark data joins → Pipeline uses local Matt Clark data instead of CourtListener API
 - [ ] Update: Case matching logic to join FJC IDB cases with Matt Clark cases by court + docket_number → `pytest tests/test_case_matching.py::test_fjc_matt_clark_join` passes
 - [ ] Update: Event parser to handle Matt Clark entry descriptions → `pytest tests/test_event_parser.py::test_matt_clark_descriptions` passes
