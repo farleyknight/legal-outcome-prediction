@@ -5,6 +5,7 @@ import logging
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
 import requests
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,24 @@ def download_fjc_data() -> Path:
     return CACHE_FILE
 
 
-def filter_cases(nos_codes: list[int]):
-    """Filter cases by Nature of Suit codes."""
-    raise NotImplementedError
+def filter_nos(df: pd.DataFrame, nos_codes: list[int] = None) -> pd.DataFrame:
+    """Filter DataFrame by Nature of Suit codes.
+
+    Args:
+        df: DataFrame with 'nature_of_suit' column (string values).
+        nos_codes: List of NOS codes to keep. Defaults to employment
+                   discrimination codes [442, 445, 446].
+
+    Returns:
+        Filtered DataFrame containing only rows matching the NOS codes.
+    """
+    if nos_codes is None:
+        nos_codes = [442, 445, 446]
+
+    # Convert codes to strings since nature_of_suit column contains strings
+    nos_codes_str = [str(code) for code in nos_codes]
+
+    filtered = df[df['nature_of_suit'].isin(nos_codes_str)]
+    logger.info(f"Filtered {len(df)} rows to {len(filtered)} with NOS codes {nos_codes}")
+
+    return filtered

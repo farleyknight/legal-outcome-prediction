@@ -4,8 +4,10 @@ import bz2
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
+
 from src import fjc_processor
-from src.fjc_processor import download_fjc_data, _get_latest_quarterly_date
+from src.fjc_processor import download_fjc_data, filter_nos, _get_latest_quarterly_date
 
 
 def test_placeholder():
@@ -60,3 +62,22 @@ def test_download_fjc_data_uses_cache(tmp_path):
     mock_get.assert_not_called()
     assert result == cache_file
     assert result.read_text() == "cached data"
+
+
+def test_nos_filter():
+    """Test that filter_nos filters DataFrame by NOS codes."""
+    # Create sample DataFrame with mixed NOS codes
+    df = pd.DataFrame({
+        'nature_of_suit': ['442', '110', '445', '320', '446', '890'],
+        'district_id': [1, 2, 3, 4, 5, 6],
+        'disposition': ['A', 'B', 'C', 'D', 'E', 'F'],
+    })
+
+    # Filter with default employment discrimination codes [442, 445, 446]
+    result = filter_nos(df)
+
+    # Should return only rows with NOS 442, 445, 446
+    assert len(result) == 3
+    assert set(result['nature_of_suit'].tolist()) == {'442', '445', '446'}
+    # Should preserve all columns
+    assert list(result.columns) == list(df.columns)
