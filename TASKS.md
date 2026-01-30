@@ -18,7 +18,7 @@
 - [x] Implement docket lookup by case identifier → `pytest tests/test_recap_client.py::test_docket_lookup` passes
 
 ## Event Parsing
-- [ ] Define event type categories (COMPLAINT, ANSWER, MOTION_TO_DISMISS, etc.) → `pytest tests/test_event_parser.py::test_event_types_defined` passes
+- [x] Define event type categories (COMPLAINT, ANSWER, MOTION_TO_DISMISS, etc.) → `pytest tests/test_event_parser.py::test_event_types_defined` passes
 - [ ] Implement docket description normalization → `pytest tests/test_event_parser.py::test_description_normalization` passes
 - [ ] Implement sequence extraction with dates → `pytest tests/test_event_parser.py::test_sequence_extraction` passes
 
