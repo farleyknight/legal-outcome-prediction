@@ -23,7 +23,7 @@
 - [x] Implement sequence extraction with dates → `pytest tests/test_event_parser.py::test_sequence_extraction` passes
 
 ## Pipeline Integration
-- [ ] Implement main pipeline orchestration → `pytest tests/test_pipeline.py::test_pipeline_runs` passes
+- [x] Implement main pipeline orchestration → `pytest tests/test_pipeline.py::test_pipeline_runs` passes
 - [ ] Implement unmatched case logging → Running pipeline creates logs/unmatched_cases.log with entries
 - [ ] Implement output CSV generation → `python -m src.pipeline --sample 100` creates data/sample_100.csv
 
