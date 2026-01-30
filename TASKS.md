@@ -8,7 +8,7 @@
 ## FJC Data Processing
 - [x] Implement FJC data downloader with caching → `python -c "from src.fjc_processor import download_fjc_data; download_fjc_data()"` creates data/fjc_civil.csv → Note: Uses CourtListener bulk data (bz2-compressed CSV)
 - [x] Implement NOS filter for employment discrimination (442, 445, 446) → `pytest tests/test_fjc_processor.py::test_nos_filter` passes
-- [ ] Implement outcome mapping to binary labels → `pytest tests/test_fjc_processor.py::test_outcome_mapping` passes
+- [x] Implement outcome mapping to binary labels → `pytest tests/test_fjc_processor.py::test_outcome_mapping` passes
 - [ ] Implement case ID extraction (district, docket_number) → `pytest tests/test_fjc_processor.py::test_case_id_extraction` passes
 
 ## RECAP API Client

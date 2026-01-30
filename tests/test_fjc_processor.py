@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 
 from src import fjc_processor
-from src.fjc_processor import download_fjc_data, filter_nos, _get_latest_quarterly_date
+from src.fjc_processor import download_fjc_data, filter_nos, map_outcome, _get_latest_quarterly_date
 
 
 def test_placeholder():
@@ -81,3 +81,75 @@ def test_nos_filter():
     assert set(result['nature_of_suit'].tolist()) == {'442', '445', '446'}
     # Should preserve all columns
     assert list(result.columns) == list(df.columns)
+
+
+def test_outcome_mapping():
+    """Test that map_outcome correctly maps disposition/judgment to binary outcomes."""
+    # Create DataFrame with various disposition/judgment combinations
+    df = pd.DataFrame({
+        'disposition': [
+            0,   # Transfer - EXCLUDE
+            1,   # Remand - EXCLUDE
+            2,   # Dismissal lack of jurisdiction - defendant_win (0)
+            3,   # Dismissal want of prosecution - defendant_win (0)
+            12,  # Voluntary dismissal - defendant_win (0)
+            4,   # Judgment on default - judgment=1 → plaintiff_win (1)
+            5,   # Judgment on consent - judgment=2 → defendant_win (0)
+            6,   # Judgment on motion - judgment=3 → EXCLUDE (both)
+            7,   # Judgment on jury - judgment=1 → plaintiff_win (1)
+            9,   # Judgment on court trial - judgment=4 → EXCLUDE (unknown)
+            10,  # MDL transfer - EXCLUDE
+            13,  # Settled - EXCLUDE
+            18,  # Arbitrator award - judgment=2 → defendant_win (0)
+        ],
+        'judgment': [
+            0,  # N/A for exclusion
+            0,  # N/A for exclusion
+            0,  # N/A for direct defendant_win
+            0,  # N/A for direct defendant_win
+            0,  # N/A for direct defendant_win
+            1,  # Plaintiff
+            2,  # Defendant
+            3,  # Both - EXCLUDE
+            1,  # Plaintiff
+            4,  # Unknown - EXCLUDE
+            0,  # N/A for exclusion
+            0,  # N/A for exclusion
+            2,  # Defendant
+        ],
+        'case_id': list(range(13)),
+    })
+
+    result = map_outcome(df)
+
+    # Should exclude rows with disposition 0, 1, 10, 11, 13, 14, 15
+    # Should exclude judgment-dependent rows with judgment 3, 4, 0
+    # Expected outcomes:
+    # - disposition 2 → 0 (defendant_win)
+    # - disposition 3 → 0 (defendant_win)
+    # - disposition 12 → 0 (defendant_win)
+    # - disposition 4, judgment 1 → 1 (plaintiff_win)
+    # - disposition 5, judgment 2 → 0 (defendant_win)
+    # - disposition 7, judgment 1 → 1 (plaintiff_win)
+    # - disposition 18, judgment 2 → 0 (defendant_win)
+    assert len(result) == 7
+
+    # Verify outcome column exists and contains only 0 and 1
+    assert 'outcome' in result.columns
+    assert set(result['outcome'].unique()) == {0, 1}
+
+    # Verify specific mappings
+    # Direct defendant wins (disposition 2, 3, 12)
+    direct_defendant_wins = result[result['disposition'].isin([2, 3, 12])]
+    assert all(direct_defendant_wins['outcome'] == 0)
+    assert len(direct_defendant_wins) == 3
+
+    # Plaintiff wins (judgment=1)
+    plaintiff_wins = result[result['outcome'] == 1]
+    assert len(plaintiff_wins) == 2
+    # These should be disposition 4 and 7 with judgment=1
+    assert set(plaintiff_wins['disposition'].tolist()) == {4, 7}
+
+    # Defendant wins from judgment (judgment=2)
+    judgment_defendant = result[(result['judgment'] == 2) & (result['outcome'] == 0)]
+    assert len(judgment_defendant) == 2  # disposition 5 and 18

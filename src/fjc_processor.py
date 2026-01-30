@@ -76,6 +76,53 @@ def download_fjc_data() -> Path:
     return CACHE_FILE
 
 
+def map_outcome(df: pd.DataFrame) -> pd.DataFrame:
+    """Map FJC disposition/judgment codes to binary outcome labels.
+
+    Args:
+        df: DataFrame with 'disposition' and 'judgment' columns.
+
+    Returns:
+        DataFrame with new 'outcome' column (0=defendant_win, 1=plaintiff_win).
+        Rows with ambiguous outcomes are excluded.
+    """
+    original_count = len(df)
+    df = df.copy()
+
+    # Disposition codes that always mean defendant win
+    defendant_win_dispositions = {2, 3, 12}
+
+    # Disposition codes that require judgment field
+    judgment_dependent_dispositions = {4, 5, 6, 7, 8, 9, 18}
+
+    # Disposition codes to exclude (transfers, remands, settlements, etc.)
+    exclude_dispositions = {0, 1, 10, 11, 13, 14, 15}
+
+    # Convert disposition to numeric if needed
+    df['disposition'] = pd.to_numeric(df['disposition'], errors='coerce')
+    df['judgment'] = pd.to_numeric(df['judgment'], errors='coerce').fillna(0)
+
+    # Initialize outcome column
+    df['outcome'] = pd.NA
+
+    # Direct defendant wins
+    df.loc[df['disposition'].isin(defendant_win_dispositions), 'outcome'] = 0
+
+    # Judgment-dependent dispositions
+    judgment_mask = df['disposition'].isin(judgment_dependent_dispositions)
+    df.loc[judgment_mask & (df['judgment'] == 1), 'outcome'] = 1  # plaintiff win
+    df.loc[judgment_mask & (df['judgment'] == 2), 'outcome'] = 0  # defendant win
+
+    # Drop rows without clear outcome (excluded dispositions, judgment 3/4/0, etc.)
+    df = df.dropna(subset=['outcome'])
+    df['outcome'] = df['outcome'].astype(int)
+
+    excluded_count = original_count - len(df)
+    logger.info(f"Mapped outcomes: {len(df)} rows remain, {excluded_count} excluded")
+
+    return df
+
+
 def filter_nos(df: pd.DataFrame, nos_codes: list[int] = None) -> pd.DataFrame:
     """Filter DataFrame by Nature of Suit codes.
 
