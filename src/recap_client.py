@@ -165,6 +165,40 @@ def search_case(case_number: str, court: str) -> dict | None:
     return docket
 
 
-def get_docket_entries(docket_id: int):
-    """Get docket entries for a given docket ID."""
-    raise NotImplementedError
+def get_docket_entries(docket_id: int) -> list[dict]:
+    """Get docket entries for a given docket ID.
+
+    Args:
+        docket_id: The CourtListener docket ID.
+
+    Returns:
+        List of docket entry dicts, each with date_filed, description, entry_number.
+        Returns empty list if no entries found.
+    """
+    cache_key = str(docket_id)
+
+    # Check cache first
+    cached = read_cache("entries", cache_key)
+    if cached is not None:
+        logger.debug(f"Cache hit for docket entries {docket_id}")
+        return cached
+
+    # Make API request for docket entries
+    url = f"{BASE_URL}docket-entries/?docket={docket_id}"
+    headers = get_api_headers()
+
+    all_entries = []
+    while url:
+        response = _make_request(url, headers)
+        response.raise_for_status()
+        data = response.json()
+
+        results = data.get("results", [])
+        all_entries.extend(results)
+
+        url = data.get("next")  # Pagination
+
+    write_cache("entries", cache_key, all_entries)
+    logger.info(f"Fetched {len(all_entries)} docket entries for docket {docket_id}")
+
+    return all_entries

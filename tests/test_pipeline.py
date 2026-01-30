@@ -24,22 +24,37 @@ def test_pipeline_runs(tmp_path):
         'judgment': ['1', '2', '1', '0', '1'],
         'DISTRICT': ['CACD', 'NYSD', 'TXED', 'FLSD', 'ILND'],
         'DESSION': ['1:21-cv-00001', '1:21-cv-00002', '1:21-cv-00003', '1:21-cv-00004', '1:21-cv-00005'],
+        'FILEDATE': ['20210115', '20210220', '20210310', '20210401', '20210515'],
+        'TERMDATE': ['20210615', '20210820', '20210910', '20211001', '20211115'],
     })
 
     # Create a temporary CSV file
     csv_path = tmp_path / "fjc_civil.csv"
     mock_fjc_data.to_csv(csv_path, index=False)
 
+    # Mock docket search result
+    mock_docket = {'id': 12345}
+    mock_entries = [
+        {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
+        {'date_filed': '2021-02-15', 'description': 'ANSWER', 'entry_number': 2},
+    ]
+
     # Mock download_fjc_data to return our temp file
-    with patch('src.pipeline.download_fjc_data', return_value=csv_path):
+    with patch('src.pipeline.download_fjc_data', return_value=csv_path), \
+         patch('src.pipeline.search_case', return_value=mock_docket), \
+         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
         result = run_pipeline()
 
     # Verify result is a DataFrame
     assert isinstance(result, pd.DataFrame)
 
-    # Verify required columns exist
+    # Verify required columns exist (new output schema)
     assert 'case_id' in result.columns
     assert 'district' in result.columns
+    assert 'filing_date' in result.columns
+    assert 'termination_date' in result.columns
+    assert 'event_sequence' in result.columns
+    assert 'days_to_resolution' in result.columns
     assert 'outcome' in result.columns
 
     # Verify NOS filtering worked (only 442, 445, 446 should remain)
