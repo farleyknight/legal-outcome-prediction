@@ -17,15 +17,15 @@ def test_placeholder():
 
 def test_pipeline_runs(tmp_path):
     """Test that run_pipeline orchestrates the FJC processing steps correctly."""
-    # Create mock FJC data that matches what the real pipeline would see
+    # Create mock FJC data that matches what the real pipeline would see (CourtListener format)
     mock_fjc_data = pd.DataFrame({
         'nature_of_suit': ['442', '442', '445', '446', '440'],
         'disposition': ['4', '4', '5', '3', '4'],
         'judgment': ['1', '2', '1', '0', '1'],
-        'DISTRICT': ['CACD', 'NYSD', 'TXED', 'FLSD', 'ILND'],
-        'DESSION': ['1:21-cv-00001', '1:21-cv-00002', '1:21-cv-00003', '1:21-cv-00004', '1:21-cv-00005'],
-        'FILEDATE': ['20210115', '20210220', '20210310', '20210401', '20210515'],
-        'TERMDATE': ['20210615', '20210820', '20210910', '20211001', '20211115'],
+        'district_id': ['CACD', 'NYSD', 'TXED', 'FLSD', 'ILND'],
+        'docket_number': ['1:21-cv-00001', '1:21-cv-00002', '1:21-cv-00003', '1:21-cv-00004', '1:21-cv-00005'],
+        'date_filed': ['2021-01-15', '2021-02-20', '2021-03-10', '2021-04-01', '2021-05-15'],
+        'date_terminated': ['2021-06-15', '2021-08-20', '2021-09-10', '2021-10-01', '2021-11-15'],
     })
 
     # Create a temporary CSV file
@@ -71,13 +71,13 @@ def test_pipeline_runs(tmp_path):
 
 def test_unmatched_case_logging(tmp_path):
     """Test that unmatched cases are logged to logs/unmatched_cases.log."""
-    # Create mock FJC data
+    # Create mock FJC data (CourtListener format)
     mock_fjc_data = pd.DataFrame({
         'nature_of_suit': ['442', '445'],
         'disposition': ['4', '5'],
         'judgment': ['1', '1'],
-        'DISTRICT': ['CACD', 'NYSD'],
-        'DESSION': ['1:21-cv-00001', '1:21-cv-00002'],
+        'district_id': ['CACD', 'NYSD'],
+        'docket_number': ['1:21-cv-00001', '1:21-cv-00002'],
     })
 
     # Create a temporary CSV file

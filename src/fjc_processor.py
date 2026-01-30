@@ -127,7 +127,7 @@ def extract_case_id(df: pd.DataFrame) -> pd.DataFrame:
     """Extract district and create case_id from FJC data.
 
     Args:
-        df: DataFrame with 'DISTRICT' column.
+        df: DataFrame with 'district_id' column (CourtListener format).
 
     Returns:
         DataFrame with new 'district' and 'case_id' columns.
@@ -135,15 +135,15 @@ def extract_case_id(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
-    # Convert DISTRICT to lowercase string, stripping whitespace
-    df['district'] = df['DISTRICT'].astype(str).str.strip().str.lower()
+    # Convert district_id to lowercase string, stripping whitespace
+    df['district'] = df['district_id'].astype(str).str.strip().str.lower()
 
     # Drop rows with missing or empty district (can't match to RECAP)
     invalid_mask = df['district'].isin(['', 'nan', 'none', 'null'])
     df = df[~invalid_mask]
 
     # Create case_id in format "{district}:{docket_number}"
-    df['case_id'] = df['district'] + ':' + df['DESSION'].astype(str)
+    df['case_id'] = df['district'] + ':' + df['docket_number'].astype(str)
 
     dropped_count = invalid_mask.sum()
     if dropped_count > 0:

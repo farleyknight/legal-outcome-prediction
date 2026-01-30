@@ -157,10 +157,10 @@ def test_outcome_mapping():
 
 def test_case_id_extraction():
     """Test that extract_case_id creates case IDs from district and docket number."""
-    # Create sample DataFrame with DISTRICT and DESSION columns (FJC naming)
+    # Create sample DataFrame with district_id and docket_number columns (CourtListener naming)
     df = pd.DataFrame({
-        'DISTRICT': ['  CA  ', 'NY', 'TX', '', 'nan', 'FL'],
-        'DESSION': ['1:2020cv12345', '2:2021cv67890', '3:2019cv11111', '4:2020cv99999', '5:2021cv88888', '6:2022cv77777'],
+        'district_id': ['  CA  ', 'NY', 'TX', '', 'nan', 'FL'],
+        'docket_number': ['1:2020cv12345', '2:2021cv67890', '3:2019cv11111', '4:2020cv99999', '5:2021cv88888', '6:2022cv77777'],
         'nature_of_suit': ['442', '442', '445', '446', '442', '445'],
     })
 
@@ -183,5 +183,5 @@ def test_case_id_extraction():
 
     # Should preserve original columns
     assert 'nature_of_suit' in result.columns
-    assert 'DISTRICT' in result.columns
-    assert 'DESSION' in result.columns
+    assert 'district_id' in result.columns
+    assert 'docket_number' in result.columns

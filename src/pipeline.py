@@ -101,7 +101,7 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
     # Step 1: Download/load FJC data
     fjc_path = download_fjc_data()
     logger.info(f"Loading FJC data from {fjc_path}")
-    df = pd.read_csv(fjc_path, dtype=str, low_memory=False)
+    df = pd.read_csv(fjc_path, dtype=str, low_memory=False, on_bad_lines='skip')
     logger.info(f"Loaded {len(df)} rows from FJC data")
 
     # Step 2: Filter by NOS codes
@@ -160,9 +160,9 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
             events = normalize_event_sequence(entries)
             event_types = [e["event_type"] for e in events]
 
-            # Convert dates
-            filing_date = convert_fjc_date(row.get("FILEDATE", ""))
-            termination_date = convert_fjc_date(row.get("TERMDATE", ""))
+            # Get dates (CourtListener format is already YYYY-MM-DD)
+            filing_date = row.get("date_filed", "")
+            termination_date = row.get("date_terminated", "")
             days_to_resolution = calculate_days_to_resolution(filing_date, termination_date)
 
             # Build output row
