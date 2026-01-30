@@ -2,7 +2,7 @@
 
 ## Setup
 - [x] Create project structure (src/, tests/, data/, logs/) → Directories exist and are importable as packages
-- [ ] Create requirements.txt with pandas, requests, pytest → `pip install -r requirements.txt` exits 0
+- [x] Create requirements.txt with pandas, requests, pytest → `pip install -r requirements.txt` exits 0
 - [ ] Create pytest.ini with basic config → `pytest --collect-only` finds test directory
 
 ## FJC Data Processing
