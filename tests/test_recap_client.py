@@ -98,3 +98,34 @@ def test_rate_limiting(monkeypatch):
     assert mock_sleep.call_count == 1
     call_args = mock_sleep.call_args[0][0]
     assert abs(call_args - 0.7) < 0.01  # Allow small floating point tolerance
+
+
+def test_caching(tmp_path, monkeypatch):
+    """Test file-based caching for API responses."""
+    # Point CACHE_DIR to tmp_path for test isolation
+    monkeypatch.setattr(recap_client, "CACHE_DIR", tmp_path)
+
+    cache_type = "dockets"
+    key = "nysd_2019cv01234"
+    test_data = {"id": 12345, "court": "nysd", "docket_number": "2019cv01234"}
+
+    # Test cache miss returns None
+    result = recap_client.read_cache(cache_type, key)
+    assert result is None
+
+    # Test write_cache creates file with correct JSON
+    recap_client.write_cache(cache_type, key, test_data)
+    cache_file = tmp_path / cache_type / f"{key}.json"
+    assert cache_file.exists()
+
+    # Test read_cache returns the cached data
+    cached_result = recap_client.read_cache(cache_type, key)
+    assert cached_result == test_data
+
+    # Test different cache_type (entries)
+    entries_key = "12345678"
+    entries_data = {"id": 12345678, "description": "Motion to dismiss"}
+    recap_client.write_cache("entries", entries_key, entries_data)
+
+    entries_result = recap_client.read_cache("entries", entries_key)
+    assert entries_result == entries_data
