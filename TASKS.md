@@ -38,6 +38,6 @@
 
 ## Integration Tests (Live API)
 - [x] Add: Integration test for API authentication with live token → `pytest tests/test_integration.py::test_live_api_auth -v` passes using real COURTLISTENER_API_TOKEN from .env
-- [ ] Add: Integration test for docket search with real case → `pytest tests/test_integration.py::test_live_docket_search -v` returns valid docket data from CourtListener
+- [x] Add: Integration test for docket search with real case → `pytest tests/test_integration.py::test_live_docket_search -v` returns valid docket data from CourtListener
 - [ ] Add: Integration test for docket entries retrieval → `pytest tests/test_integration.py::test_live_docket_entries -v` returns real docket entries with descriptions
 - [ ] Add: Integration test for end-to-end pipeline with small sample → `pytest tests/test_integration.py::test_live_pipeline_sample -v` processes 5 real cases successfully
