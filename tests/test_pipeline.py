@@ -365,3 +365,65 @@ def test_match_rate_logging(tmp_path):
 
     # Clean up logger handlers for subsequent tests
     unmatched_logger.handlers.clear()
+
+
+def test_negative_days_validation(tmp_path):
+    """Test that cases with negative days_to_resolution are excluded from output."""
+    # Create mock FJC data with:
+    # - First case: valid dates (termination after filing)
+    # - Second case: invalid dates (termination BEFORE filing - negative days)
+    mock_fjc_data = pd.DataFrame({
+        'nature_of_suit': ['442', '445'],
+        'disposition': ['4', '5'],
+        'judgment': ['1', '2'],
+        'district_id': ['CACD', 'NYSD'],
+        'docket_number': ['1:21-cv-00001', '1:21-cv-00002'],
+        'date_filed': ['2021-01-15', '2021-06-15'],  # Second case: filed June 15
+        'date_terminated': ['2021-06-15', '2021-01-15'],  # Second case: terminated Jan 15 (BEFORE filing)
+    })
+
+    # Create a temporary CSV file
+    csv_path = tmp_path / "fjc_civil.csv"
+    mock_fjc_data.to_csv(csv_path, index=False)
+
+    # Create temp log directory for test
+    test_log_dir = tmp_path / "logs"
+    test_log_dir.mkdir(parents=True, exist_ok=True)
+    test_log_path = test_log_dir / "unmatched_cases.log"
+
+    # Clear any existing handlers from the unmatched_cases logger
+    unmatched_logger = logging.getLogger("unmatched_cases")
+    unmatched_logger.handlers.clear()
+
+    # Mock docket search result and entries
+    mock_docket = {'id': 12345}
+    mock_entries = [
+        {'date_filed': '2021-01-15', 'description': 'COMPLAINT', 'entry_number': 1},
+        {'date_filed': '2021-02-15', 'description': 'ANSWER', 'entry_number': 2},
+    ]
+
+    with patch('src.pipeline.LOGS_DIR', test_log_dir), \
+         patch('src.pipeline.UNMATCHED_LOG_PATH', test_log_path), \
+         patch('src.pipeline.download_fjc_data', return_value=csv_path), \
+         patch('src.pipeline.search_case', return_value=mock_docket), \
+         patch('src.pipeline.get_docket_entries', return_value=mock_entries):
+        result = run_pipeline()
+
+    # Verify only 1 case in output (the valid one)
+    assert len(result) == 1, f"Expected 1 case in output, got {len(result)}"
+
+    # Verify the valid case is in output (CACD district, positive days_to_resolution)
+    # Note: district is lowercased by the pipeline
+    assert result.iloc[0]['district'].upper() == 'CACD'
+    assert result.iloc[0]['days_to_resolution'] > 0
+
+    # Verify the invalid case was logged
+    assert test_log_path.exists(), "Unmatched log file should be created"
+    log_content = test_log_path.read_text()
+    assert 'negative_days_to_resolution=true' in log_content, \
+        "Log should contain negative_days_to_resolution reason"
+    # Note: district is lowercased by the pipeline
+    assert 'nysd' in log_content.lower(), "Log should contain the invalid case's district"
+
+    # Clean up logger handlers for subsequent tests
+    unmatched_logger.handlers.clear()

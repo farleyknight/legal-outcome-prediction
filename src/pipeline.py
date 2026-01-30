@@ -165,6 +165,15 @@ def run_pipeline(sample_size: int | None = None) -> pd.DataFrame:
             termination_date = row.get("date_terminated", "")
             days_to_resolution = calculate_days_to_resolution(filing_date, termination_date)
 
+            # Validate days_to_resolution is not negative (termination before filing)
+            if days_to_resolution is not None and days_to_resolution < 0:
+                unmatched_count += 1
+                unmatched_logger.info(
+                    f"case_id={case_id} district={district} negative_days_to_resolution=true "
+                    f"filing_date={filing_date} termination_date={termination_date}"
+                )
+                continue
+
             # Build output row
             output_rows.append({
                 "case_id": case_id,
