@@ -68,3 +68,17 @@
 - [x] Remove: CourtListener API dependency (keep as optional fallback) → Pipeline runs without COURTLISTENER_API_TOKEN env var
 - [x] Update: README.md to document Matt Clark data source and new setup instructions → README reflects new data pipeline
 - [x] Add: Script to filter Matt Clark data to employment discrimination cases only → Reduces data size for faster iteration
+
+## Matt Clark Integration Tests (High Priority)
+- [x] Add: Integration test for Matt Clark dataset download → `pytest tests/test_matt_clark_integration.py::test_download_cases_file -v` downloads cases.zip from archive.org (skips if already exists)
+- [ ] Add: Integration test for Matt Clark entries download → `pytest tests/test_matt_clark_integration.py::test_download_entries_file -v` downloads at least one year's entries file (skips if already exists)
+- [ ] Add: Integration test for Matt Clark case lookup with real data → `pytest tests/test_matt_clark_integration.py::test_case_lookup_real_data -v` loads cases.csv and successfully queries by court/docket_number
+- [ ] Add: Integration test for Matt Clark entries retrieval with real data → `pytest tests/test_matt_clark_integration.py::test_entries_retrieval_real_data -v` loads entries for a known docket_id and returns non-empty results
+- [ ] Add: Integration test for FJC-to-Matt Clark matching with real data → `pytest tests/test_matt_clark_integration.py::test_fjc_matt_clark_match -v` matches a sample of FJC cases against downloaded Matt Clark data
+- [ ] Add: Integration test for full pipeline using Matt Clark data → `pytest tests/test_matt_clark_integration.py::test_pipeline_matt_clark_only -v` runs pipeline with Matt Clark as sole data source (no API fallback)
+
+## Matt Clark Documentation (Medium Priority)
+- [ ] Add: specs/MATT_CLARK_DATA.md with schema documentation → File exists and includes: cases.csv columns (docket_id, court, docket_number, case_name, date_filed, date_terminated), entries.csv columns (docket_id, entry_number, date_filed, description), data types for each field
+- [ ] Add: Usage examples to specs/MATT_CLARK_DATA.md → File includes: how to download data, how to query cases, how to fetch entries, code examples using matt_clark_parser.py
+- [ ] Add: Docket number format documentation to specs/MATT_CLARK_DATA.md → File documents Matt Clark format ("1:19-cv-01234") vs FJC format ("20191234") and normalization rules
+- [ ] Add: Data coverage notes to specs/MATT_CLARK_DATA.md → File documents: date range (2013-present), court coverage, known limitations, file sizes
