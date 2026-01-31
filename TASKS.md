@@ -66,5 +66,5 @@
 - [x] Update: Case matching logic to join FJC IDB cases with Matt Clark cases by court + docket_number → `pytest tests/test_case_matching.py::test_fjc_matt_clark_join` passes
 - [x] Update: Event parser to handle Matt Clark entry descriptions → `pytest tests/test_event_parser.py::test_matt_clark_descriptions` passes → Note: Existing patterns already handle Matt Clark formats
 - [x] Remove: CourtListener API dependency (keep as optional fallback) → Pipeline runs without COURTLISTENER_API_TOKEN env var
-- [ ] Update: README.md to document Matt Clark data source and new setup instructions → README reflects new data pipeline
+- [x] Update: README.md to document Matt Clark data source and new setup instructions → README reflects new data pipeline
 - [ ] Add: Script to filter Matt Clark data to employment discrimination cases only → Reduces data size for faster iteration
