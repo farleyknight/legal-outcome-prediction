@@ -67,4 +67,4 @@
 - [x] Update: Event parser to handle Matt Clark entry descriptions → `pytest tests/test_event_parser.py::test_matt_clark_descriptions` passes → Note: Existing patterns already handle Matt Clark formats
 - [x] Remove: CourtListener API dependency (keep as optional fallback) → Pipeline runs without COURTLISTENER_API_TOKEN env var
 - [x] Update: README.md to document Matt Clark data source and new setup instructions → README reflects new data pipeline
-- [ ] Add: Script to filter Matt Clark data to employment discrimination cases only → Reduces data size for faster iteration
+- [x] Add: Script to filter Matt Clark data to employment discrimination cases only → Reduces data size for faster iteration
